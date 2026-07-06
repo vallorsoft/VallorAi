@@ -1,6 +1,7 @@
 import type { AIAdapter, AICompletionOptions, AICompletionResult } from './interface'
 import { ClaudeAdapter } from './adapters/claude'
 import { OpenAIAdapter } from './adapters/openai'
+import { GeminiAdapter } from './adapters/gemini'
 
 export type ProviderName = 'CLAUDE' | 'OPENAI' | 'GEMINI' | 'DEEPSEEK' | 'MISTRAL' | 'LOCAL'
 
@@ -26,6 +27,12 @@ export class AIGateway {
       this.adapters.set(
         'OPENAI',
         new OpenAIAdapter(config.providers.OPENAI.apiKey, config.providers.OPENAI.model),
+      )
+    }
+    if (config.providers.GEMINI) {
+      this.adapters.set(
+        'GEMINI',
+        new GeminiAdapter(config.providers.GEMINI.apiKey, config.providers.GEMINI.model),
       )
     }
   }

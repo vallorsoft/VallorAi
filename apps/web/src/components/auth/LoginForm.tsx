@@ -20,19 +20,38 @@ export function LoginForm() {
   const router = useRouter()
   const setTokens = useAuthStore((s) => s.setTokens)
   const [error, setError] = useState('')
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
+  const [resent, setResent] = useState(false)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
   const onSubmit = async (data: FormData) => {
     setError('')
+    setUnverifiedEmail('')
+    setResent(false)
     try {
       const res = await api.post('/auth/login', data)
       setTokens(res.data.accessToken, res.data.refreshToken)
       router.push('/projects')
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number; data?: { message?: string } } }
+      if (err.response?.status === 403) {
+        setUnverifiedEmail(getValues('email'))
+        setError(err.response?.data?.message ?? 'Email neconfirmat')
+      } else {
+        setError('Email sau parolă incorectă')
+      }
+    }
+  }
+
+  const resendVerification = async () => {
+    try {
+      await api.post('/auth/resend-verification', { email: unverifiedEmail })
+      setResent(true)
     } catch {
-      setError('Email sau parolă incorectă')
+      setResent(false)
     }
   }
 
@@ -67,6 +86,16 @@ export function LoginForm() {
         {error && (
           <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-red-600 text-sm">
             {error}
+            {unverifiedEmail && !resent && (
+              <button
+                type="button"
+                onClick={resendVerification}
+                className="block mt-1 text-brand-600 font-medium hover:text-brand-700"
+              >
+                Retrimite emailul de confirmare
+              </button>
+            )}
+            {resent && <p className="mt-1 text-green-600">Email retrimis — verifică-ți inboxul.</p>}
           </div>
         )}
 

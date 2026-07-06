@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { api } from '@/lib/api'
-import { useAuthStore } from '@/store/auth.store'
 
 const schema = z.object({
   name: z.string().min(2, 'Numele trebuie să aibă minim 2 caractere'),
@@ -18,9 +16,8 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function RegisterForm() {
-  const router = useRouter()
-  const setTokens = useAuthStore((s) => s.setTokens)
   const [error, setError] = useState('')
+  const [submitted, setSubmitted] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -29,13 +26,23 @@ export function RegisterForm() {
   const onSubmit = async (data: FormData) => {
     setError('')
     try {
-      const res = await api.post('/auth/register', { ...data, language: 'ro', country: 'RO' })
-      setTokens(res.data.accessToken, res.data.refreshToken)
-      router.push('/projects')
+      await api.post('/auth/register', { ...data, language: 'ro', country: 'RO' })
+      setSubmitted(true)
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } }
       setError(err?.response?.data?.message ?? 'Înregistrare eșuată')
     }
+  }
+
+  if (submitted) {
+    return (
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Verifică-ți emailul</h1>
+        <p className="text-gray-500 text-sm">
+          Ți-am trimis un link de confirmare. Deschide-l pentru a-ți activa contul și a te putea autentifica.
+        </p>
+      </div>
+    )
   }
 
   return (

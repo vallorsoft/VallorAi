@@ -1,24 +1,31 @@
-app = "vallorai"
-primary_region = "fra"
+# fly.toml app configuration file generated for vallorai-api on 2026-07-06T18:46:09Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'vallorai-api'
+primary_region = 'fra'
 
 [build]
-  dockerfile = "Dockerfile.web"
+  dockerfile = 'Dockerfile.web'
+
   [build.args]
-    NEXT_PUBLIC_API_URL = "https://vallorai-api.fly.dev/api/v1"
+    NEXT_PUBLIC_API_URL = 'https://vallorai-api.fly.dev/api/v1'
 
 [env]
-  NODE_ENV = "production"
-  PORT = "3000"
-  NEXT_TELEMETRY_DISABLED = "1"
+  NEXT_TELEMETRY_DISABLED = '1'
+  NODE_ENV = 'production'
+  PORT = '3000'
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
 [[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
+  memory = '512mb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 512

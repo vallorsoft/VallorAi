@@ -15,7 +15,7 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Create app if not exists
-        run: flyctl apps create vallorai-api --org personal 2>/dev/null || true
+        run: flyctl apps create vallorai-api 2>&1 | grep -v "already exists" || true
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
@@ -34,7 +34,7 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Create app if not exists
-        run: flyctl apps create vallorai --org personal 2>/dev/null || true
+        run: flyctl apps create vallorai 2>&1 | grep -v "already exists" || true
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 

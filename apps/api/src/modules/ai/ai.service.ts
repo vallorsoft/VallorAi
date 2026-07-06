@@ -8,7 +8,7 @@ import { SYSTEM_PROMPT_RO } from './prompts/system.prompt'
 export class AiService {
   private readonly gateway: AIGateway
 
-  constructor(private readonly config: ConfigService) {
+  constructor(config: ConfigService) {
     this.gateway = new AIGateway({
       defaultProvider: (config.get('AI_PROVIDER') as never) ?? 'CLAUDE',
       providers: {

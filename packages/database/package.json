@@ -2,6 +2,11 @@
   "name": "@ai-home-designer/database",
   "version": "0.1.0",
   "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -16,8 +21,5 @@
     "prisma": "^5.15.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.4.0"
-  },
-  "exports": {
-    ".": "./src/index.ts"
   }
 }

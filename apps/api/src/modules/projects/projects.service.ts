@@ -46,29 +46,29 @@ export class ProjectsService {
     return prisma.project.delete({ where: { id } })
   }
 
-  async updatePlot(projectId: string, userId: string, data: object) {
+  async updatePlot(projectId: string, userId: string, data: Record<string, unknown>) {
     await this.findOne(projectId, userId)
     return prisma.plot.upsert({
       where: { projectId },
-      create: { projectId, ...data as never },
+      create: { projectId, ...data } as never,
       update: data as never,
     })
   }
 
-  async updateLifestyle(projectId: string, userId: string, data: object) {
+  async updateLifestyle(projectId: string, userId: string, data: Record<string, unknown>) {
     await this.findOne(projectId, userId)
     return prisma.lifestyle.upsert({
       where: { projectId },
-      create: { projectId, ...data as never },
+      create: { projectId, ...data } as never,
       update: data as never,
     })
   }
 
-  async updateBudget(projectId: string, userId: string, data: object) {
+  async updateBudget(projectId: string, userId: string, data: Record<string, unknown>) {
     await this.findOne(projectId, userId)
     return prisma.budget.upsert({
       where: { projectId },
-      create: { projectId, ...data as never },
+      create: { projectId, ...data } as never,
       update: data as never,
     })
   }

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
 
-interface CostItem {
+export interface CostItem {
   category: string
   name: string
   quantity: number
@@ -49,24 +49,26 @@ export class CostsService {
     const total = breakdown.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
 
     await prisma.costEstimate.upsert({
-      where: { houseId },
-      create: { houseId, totalCost: total, currency: 'RON', breakdown: breakdown as never },
-      update: { totalCost: total, breakdown: breakdown as never },
+      where: { projectId: house.projectId },
+      create: { projectId: house.projectId, total, currency: 'RON', breakdown: breakdown as never },
+      update: { total, breakdown: breakdown as never },
     })
 
     return { breakdown, total, currency: 'RON' }
   }
 
   async getEstimate(houseId: string) {
-    const estimate = await prisma.costEstimate.findUnique({ where: { houseId } })
+    const house = await prisma.house.findUnique({ where: { id: houseId } })
+    if (!house) throw new NotFoundException('House not found')
+    const estimate = await prisma.costEstimate.findUnique({ where: { projectId: house.projectId } })
     if (!estimate) throw new NotFoundException('No estimate found — run estimate first')
     return estimate
   }
 
   async getByProject(projectId: string) {
-    const house = await prisma.house.findUnique({ where: { projectId } })
-    if (!house) throw new NotFoundException('House not found for this project')
-    return this.getEstimate(house.id)
+    const estimate = await prisma.costEstimate.findUnique({ where: { projectId } })
+    if (!estimate) throw new NotFoundException('No estimate found — run estimate first')
+    return estimate
   }
 
   async estimateByProject(projectId: string) {

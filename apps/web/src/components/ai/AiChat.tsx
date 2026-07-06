@@ -43,8 +43,7 @@ export function AiChat({ projectId }: AiChatProps) {
 
     try {
       // Use non-streaming chat for simplicity; swap to SSE stream for production
-      const res = await api.post(`/ai/projects/${projectId}/chat`, { message: text })
-      const _ = res.data
+      await api.post(`/ai/projects/${projectId}/chat`, { message: text })
       await qc.invalidateQueries({ queryKey: ['conversation', projectId] })
     } catch {
       setStreamingContent('Eroare la comunicarea cu AI-ul. Încearcă din nou.')

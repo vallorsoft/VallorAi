@@ -1,6 +1,14 @@
 # AI Home Designer — Build Progress
 
-> Last updated: 2026-07-06
+> Last updated: 2026-07-06 (post-launch)
+
+## Live status
+- **API**: https://vallorai-api.fly.dev/api/v1 — deployed, stable
+- **Web**: https://vallorai.fly.dev — deployed, stable
+- **DB**: Neon PostgreSQL, 13 tables pushed; `db-push` job runs automatically on every deploy
+- **Auth**: register + login confirmed working end-to-end on the live site
+- **AI provider**: Gemini (default), Claude and OpenAI adapters also wired in
+- Nothing beyond signup/login has been exercised live yet — projects, editor, AI chat, costs, exports all exist in code but are unverified in production.
 
 ## Legend
 - ✅ Done
@@ -80,11 +88,33 @@
 
 | Task | Status |
 |------|--------|
-| `fly.toml` for API deployment | ⬜ |
-| `Dockerfile` for API | ⬜ |
-| GitHub Actions CI/CD pipeline | ⬜ |
-| Neon DB connection + migrations | ⬜ |
+| `fly.toml` for API + web deployment | ✅ |
+| `Dockerfile.api` + `Dockerfile.web` | ✅ |
+| GitHub Actions CI/CD pipeline (db-push → deploy-api → deploy-web) | ✅ |
+| Neon DB connection + `prisma db push` (13 tables live) | ✅ |
+| Workspace packages compiled to JS for runtime (fixed API crash-loop) | ✅ |
 | Cloudflare R2 storage integration | ⬜ |
+
+---
+
+## Phase 5.5 — Email (Brevo) — IN PROGRESS
+
+Registration currently issues JWT tokens immediately with no email step at all.
+Target: full email verification before first login, using Brevo as the transactional
+email provider. **Emails go out using Brevo's own default/system sender template
+for now** — no custom HTML design yet. Swapping in a branded Romanian-language
+template is a separate, later task once the product has real users.
+
+| Task | Status |
+|------|--------|
+| Add `verificationToken` + `verificationTokenExpiresAt` to `User` model | ⬜ |
+| `MailModule`/`MailService` — thin wrapper over Brevo's transactional email REST API (`api.brevo.com/v3/smtp/email`), no new SDK dependency (uses native `fetch`) | ⬜ |
+| `register()`: create user as unverified, generate token, send verification email, do **not** issue JWT yet — return a "check your email" response instead | ⬜ |
+| `login()`: reject with a clear error if `isVerified` is false | ⬜ |
+| `POST /auth/verify-email` — validates token + expiry, sets `isVerified = true`, issues JWT tokens | ⬜ |
+| `POST /auth/resend-verification` — regenerates token, resends email (covers expired/lost emails) | ⬜ |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` — Fly.io secrets + `.env.example` | ⬜ |
+| Web: `/verify-email?token=...` page that calls the endpoint and logs the user in on success | ⬜ |
 
 ---
 
@@ -106,10 +136,8 @@
 ---
 
 ## Next immediate steps
-1. `pnpm install` — install all dependencies
-2. Set up `.env` files with real keys
-3. `pnpm db:push` — create DB tables in Neon
-4. `pnpm dev` — start both API and web
-5. Test auth flow end-to-end
-6. Wire AI chat to update the floor plan canvas when design_update is returned
-7. Add `fly.toml` + `Dockerfile` for API deployment
+1. **Email verification via Brevo** (Phase 5.5 above) — blocks trusting who's actually registering
+2. Manually exercise every live feature end-to-end (projects CRUD, editor canvas, AI chat, cost estimate, exports) and fix whatever breaks — none of it has been tested against the real deployed DB yet
+3. Cloudflare R2 for file/photo storage (Plot photos, exported documents)
+4. Wire AI chat to update the floor plan canvas when a `design_update` payload comes back
+5. Revisit Phase 6 feature list with the client and prioritize

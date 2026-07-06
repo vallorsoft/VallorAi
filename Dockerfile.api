@@ -1,0 +1,32 @@
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && apk add --no-cache openssl
+
+FROM base AS installer
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml ./
+COPY packages/types/package.json ./packages/types/
+COPY packages/database/package.json ./packages/database/
+COPY packages/ai-gateway/package.json ./packages/ai-gateway/
+COPY apps/api/package.json ./apps/api/
+RUN pnpm install --no-frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=installer /app/node_modules ./node_modules
+COPY packages/ ./packages/
+COPY apps/api/ ./apps/api/
+COPY tsconfig.base.json ./
+RUN pnpm --filter @ai-home-designer/database exec prisma generate
+RUN pnpm --filter @ai-home-designer/api build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN apk add --no-cache openssl
+COPY --from=installer /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/api/dist ./dist
+EXPOSE 3001
+CMD ["node", "dist/main.js"]

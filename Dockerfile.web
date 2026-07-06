@@ -1,0 +1,37 @@
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+FROM base AS installer
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml ./
+COPY packages/types/package.json ./packages/types/
+COPY packages/database/package.json ./packages/database/
+COPY packages/ai-gateway/package.json ./packages/ai-gateway/
+COPY apps/web/package.json ./apps/web/
+RUN pnpm install --no-frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+ARG NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1
+# Override at deploy time: fly deploy --build-arg NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=installer /app/node_modules ./node_modules
+COPY packages/ ./packages/
+COPY apps/web/ ./apps/web/
+COPY tsconfig.base.json ./
+RUN pnpm --filter @ai-home-designer/web build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]

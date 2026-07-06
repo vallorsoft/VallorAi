@@ -14,8 +14,7 @@ RUN pnpm install --no-frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml ./
-COPY --from=installer /app/node_modules ./node_modules
+COPY --from=installer /app ./
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 COPY tsconfig.base.json ./
@@ -26,8 +25,6 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache openssl
-COPY --from=installer /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app ./
 EXPOSE 3001
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/api/dist/main.js"]

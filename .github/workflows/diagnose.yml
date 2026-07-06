@@ -1,0 +1,42 @@
+name: Diagnose API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: API status and logs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: App status
+        run: flyctl status -a vallorai-api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Machine list
+        run: flyctl machine list -a vallorai-api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Secrets list (names only)
+        run: flyctl secrets list -a vallorai-api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Recent logs (20s capture)
+        run: timeout 20 flyctl logs -a vallorai-api || true
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Health check from runner
+        run: |
+          echo "--- GET /api/v1 ---"
+          curl -sS -m 30 -o /dev/null -w "HTTP status: %{http_code}, total time: %{time_total}s\n" https://vallorai-api.fly.dev/api/v1 || echo "request failed"
+          echo "--- POST /api/v1/auth/register (dummy) ---"
+          curl -sS -m 60 -w "\nHTTP status: %{http_code}, total time: %{time_total}s\n" \
+            -H "Content-Type: application/json" \
+            -H "Origin: https://vallorai.fly.dev" \
+            -d '{"email":"diag-test@example.com","name":"Diag Test","password":"testpass1234"}' \
+            https://vallorai-api.fly.dev/api/v1/auth/register || echo "request failed"

@@ -15,6 +15,7 @@ RUN pnpm install --no-frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1
+# Override at deploy time: fly deploy --build-arg NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=installer /app/node_modules ./node_modules

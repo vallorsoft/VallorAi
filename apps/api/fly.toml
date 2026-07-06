@@ -1,4 +1,4 @@
-app = "vallorai"
+app = "vallorai-api"
 primary_region = "fra"
 
 [build]

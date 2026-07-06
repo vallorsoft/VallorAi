@@ -1,0 +1,47 @@
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
+import { AuthGuard } from '@nestjs/passport'
+import { HousesService } from './houses.service'
+
+@ApiTags('houses')
+@ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
+@Controller('houses')
+export class HousesController {
+  constructor(private readonly housesService: HousesService) {}
+
+  @Get('projects/:id')
+  findByProject(@Param('id') projectId: string) {
+    return this.housesService.findByProject(projectId)
+  }
+
+  @Post('projects/:id')
+  upsert(@Param('id') projectId: string, @Body() body: { floors?: number; roofType?: string }) {
+    return this.housesService.upsert(projectId, body)
+  }
+
+  @Post(':id/rooms')
+  addRoom(@Param('id') houseId: string, @Body() body: object) {
+    return this.housesService.addRoom(houseId, body as never)
+  }
+
+  @Patch('rooms/:id')
+  updateRoom(@Param('id') roomId: string, @Body() body: object) {
+    return this.housesService.updateRoom(roomId, body)
+  }
+
+  @Delete('rooms/:id')
+  removeRoom(@Param('id') roomId: string) {
+    return this.housesService.removeRoom(roomId)
+  }
+
+  @Post(':id/walls')
+  addWall(@Param('id') houseId: string, @Body() body: object) {
+    return this.housesService.addWall(houseId, body as never)
+  }
+
+  @Patch('walls/:id')
+  updateWall(@Param('id') wallId: string, @Body() body: object) {
+    return this.housesService.updateWall(wallId, body)
+  }
+}

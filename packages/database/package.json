@@ -1,0 +1,23 @@
+{
+  "name": "@ai-home-designer/database",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.15.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.15.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

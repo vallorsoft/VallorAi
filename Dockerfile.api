@@ -19,7 +19,9 @@ COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 COPY tsconfig.base.json ./
 RUN pnpm --filter @ai-home-designer/database exec prisma generate
-RUN pnpm --filter @ai-home-designer/api build
+RUN pnpm --filter @ai-home-designer/database build \
+ && pnpm --filter @ai-home-designer/ai-gateway build \
+ && pnpm --filter @ai-home-designer/api build
 
 FROM node:20-alpine AS runner
 WORKDIR /app

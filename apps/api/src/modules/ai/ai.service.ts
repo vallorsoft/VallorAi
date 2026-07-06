@@ -10,8 +10,12 @@ export class AiService {
 
   constructor(config: ConfigService) {
     this.gateway = new AIGateway({
-      defaultProvider: (config.get('AI_PROVIDER') as never) ?? 'CLAUDE',
+      defaultProvider: (config.get('AI_PROVIDER') as never) ?? 'GEMINI',
       providers: {
+        GEMINI: {
+          apiKey: config.get('GEMINI_API_KEY') ?? '',
+          model: config.get('GEMINI_MODEL') ?? 'gemini-1.5-pro',
+        },
         CLAUDE: {
           apiKey: config.get('ANTHROPIC_API_KEY') ?? '',
           model: config.get('CLAUDE_MODEL') ?? 'claude-sonnet-5',

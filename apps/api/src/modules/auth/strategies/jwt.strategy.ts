@@ -13,7 +13,7 @@ interface JwtPayload {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private readonly config: ConfigService,
+    config: ConfigService,
     private readonly usersService: UsersService,
   ) {
     super({

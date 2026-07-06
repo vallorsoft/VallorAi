@@ -47,7 +47,7 @@ export class ProjectsController {
   @Patch(':id/plot')
   updatePlot(
     @Param('id') id: string,
-    @Body() body: object,
+    @Body() body: Record<string, unknown>,
     @Request() req: { user: { id: string } },
   ) {
     return this.projectsService.updatePlot(id, req.user.id, body)
@@ -56,7 +56,7 @@ export class ProjectsController {
   @Patch(':id/lifestyle')
   updateLifestyle(
     @Param('id') id: string,
-    @Body() body: object,
+    @Body() body: Record<string, unknown>,
     @Request() req: { user: { id: string } },
   ) {
     return this.projectsService.updateLifestyle(id, req.user.id, body)
@@ -65,7 +65,7 @@ export class ProjectsController {
   @Patch(':id/budget')
   updateBudget(
     @Param('id') id: string,
-    @Body() body: object,
+    @Body() body: Record<string, unknown>,
     @Request() req: { user: { id: string } },
   ) {
     return this.projectsService.updateBudget(id, req.user.id, body)

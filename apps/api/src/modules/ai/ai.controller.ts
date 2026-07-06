@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Param, Body, Sse, UseGuards, Request } from '@nestjs/common'
+import { Controller, Get, Post, Param, Body, Sse, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport'
-import { Observable, from } from 'rxjs'
+import { Observable } from 'rxjs'
 import { AiService } from './ai.service'
 
 @ApiTags('ai')

@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next'
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   output: 'standalone',
   transpilePackages: ['@ai-home-designer/types'],
   images: {
@@ -8,9 +7,6 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.r2.dev' },
       { protocol: 'https', hostname: 'assets.vallorai.com' },
     ],
-  },
-  experimental: {
-    typedRoutes: true,
   },
 }
 

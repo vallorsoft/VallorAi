@@ -26,7 +26,6 @@ export class ExportsService {
         name: project.name,
         type: project.type,
         status: project.status,
-        style: project.style,
         createdAt: project.createdAt,
       },
       plot: project.plot,
@@ -58,15 +57,13 @@ export class ExportsService {
     type: string
     title: string
     fileUrl?: string
-    metadata?: Record<string, unknown>
   }) {
     return prisma.document.create({
       data: {
         projectId,
         type: data.type,
-        title: data.title,
+        name: data.title,
         fileUrl: data.fileUrl,
-        metadata: data.metadata as never,
       },
     })
   }

@@ -3,6 +3,7 @@ name: Deploy to Fly.io
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy-api:
@@ -15,19 +16,6 @@ jobs:
 
       - name: Create app if not exists
         run: fly apps create vallorai-api --org personal 2>/dev/null || true
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-      - name: Set secrets
-        run: |
-          fly secrets set \
-            NODE_ENV=production \
-            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            JWT_REFRESH_SECRET="${{ secrets.JWT_REFRESH_SECRET }}" \
-            ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
-            FRONTEND_URL="https://vallorai.fly.dev" \
-            --app vallorai-api --stage
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 

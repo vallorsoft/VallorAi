@@ -15,12 +15,12 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Create app if not exists
-        run: fly apps create vallorai-api --org personal 2>/dev/null || true
+        run: flyctl apps create vallorai-api --org personal 2>/dev/null || true
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy
-        run: fly deploy --config apps/api/fly.toml --source-dir . --ha=false
+        run: flyctl deploy --config apps/api/fly.toml --source-dir . --ha=false
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
@@ -34,13 +34,13 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Create app if not exists
-        run: fly apps create vallorai --org personal 2>/dev/null || true
+        run: flyctl apps create vallorai --org personal 2>/dev/null || true
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy
         run: |
-          fly deploy \
+          flyctl deploy \
             --config apps/web/fly.toml \
             --source-dir . \
             --build-arg NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1 \

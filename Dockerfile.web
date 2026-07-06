@@ -18,8 +18,7 @@ ARG NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1
 # Override at deploy time: fly deploy --build-arg NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY package.json pnpm-workspace.yaml ./
-COPY --from=installer /app/node_modules ./node_modules
+COPY --from=installer /app ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 COPY tsconfig.base.json ./

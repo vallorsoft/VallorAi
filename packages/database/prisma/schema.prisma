@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// USERS & AUTH
+// =====================
+
+enum UserRole {
+  GUEST
+  USER
+  CLIENT
+  ARCHITECT
+  STRUCTURAL_ENGINEER
+  MEP_ENGINEER
+  ELECTRICAL_ENGINEER
+  CONTRACTOR
+  MANUFACTURER
+  SUPPLIER
+  ADMIN
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String?
+  role      UserRole @default(USER)
+  plan      SubscriptionPlan @default(FREE)
+  language  String   @default("ro")
+  country   String   @default("RO")
+  avatarUrl String?
+  isVerified Boolean @default(false)
+
+  projects  Project[]
+  sessions  Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// =====================
+// PROJECTS
+// =====================
+
+enum ProjectType {
+  FAMILY_HOUSE
+  VACATION_HOUSE
+  EXTENSION
+  RENOVATION
+  OFFICE
+  INVESTMENT
+}
+
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  REVIEW
+  APPROVED
+  PERMIT_READY
+  CONSTRUCTION
+  COMPLETED
+}
+
+model Project {
+  id     String        @id @default(cuid())
+  userId String
+  name   String
+  type   ProjectType   @default(FAMILY_HOUSE)
+  status ProjectStatus @default(DRAFT)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plot        Plot?
+  lifestyle   Lifestyle?
+  budget      Budget?
+  house       House?
+  messages    Message[]
+  documents   Document[]
+  costEstimate CostEstimate?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Plot {
+  id             String  @id @default(cuid())
+  projectId      String  @unique
+  country        String  @default("RO")
+  county         String?
+  city           String?
+  address        String?
+  cadastralNumber String?
+  lat            Float?
+  lng            Float?
+  area           Float?
+  slope          Float   @default(0)
+  orientation    String?
+  zone           String?
+  hasWater       Boolean @default(false)
+  hasSewage      Boolean @default(false)
+  hasGas         Boolean @default(false)
+  hasElectricity Boolean @default(false)
+  hasInternet    Boolean @default(false)
+  photos         String[]
+  documents      String[]
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lifestyle {
+  id               String  @id @default(cuid())
+  projectId        String  @unique
+  residents        Int     @default(2)
+  children         Int     @default(0)
+  planningChildren Boolean @default(false)
+  elderlyResident  Boolean @default(false)
+  mobilityImpaired Boolean @default(false)
+  pets             Boolean @default(false)
+  homeOffice       Boolean @default(false)
+  garage           Boolean @default(false)
+  pool             Boolean @default(false)
+  terrace          Boolean @default(true)
+  basement         Boolean @default(false)
+  attic            Boolean @default(false)
+  solarPanels      Boolean @default(false)
+  heatPump         Boolean @default(false)
+  style            String  @default("MODERN")
+  favoriteColors   String[]
+  additionalNotes  String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Budget {
+  id        String  @id @default(cuid())
+  projectId String  @unique
+  currency  String  @default("RON")
+  minimum   Float?
+  optimal   Float?
+  maximum   Float?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =====================
+// HOUSE DESIGN
+// =====================
+
+model House {
+  id         String @id @default(cuid())
+  projectId  String @unique
+  totalArea  Float  @default(0)
+  floors     Int    @default(1)
+  roofType   String @default("GABLED")
+  version    Int    @default(1)
+
+  rooms    Room[]
+  walls    Wall[]
+  openings Opening[]
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id      String @id @default(cuid())
+  houseId String
+  type    String
+  name    String
+  floor   Int    @default(0)
+  area    Float
+  width   Float
+  height  Float
+  posX    Float  @default(0)
+  posY    Float  @default(0)
+  aiJustification String?
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  @@index([houseId])
+}
+
+model Wall {
+  id         String  @id @default(cuid())
+  houseId    String
+  startX     Float
+  startY     Float
+  endX       Float
+  endY       Float
+  floor      Int     @default(0)
+  thickness  Float   @default(0.3)
+  height     Float   @default(2.7)
+  isLoad     Boolean @default(false)
+  isExterior Boolean @default(false)
+  material   String?
+
+  house    House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  openings Opening[]
+
+  @@index([houseId])
+}
+
+model Opening {
+  id             String  @id @default(cuid())
+  houseId        String
+  wallId         String
+  type           String
+  position       Float
+  width          Float
+  height         Float
+  sillHeight     Float   @default(0)
+  swingDirection String?
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  wall  Wall  @relation(fields: [wallId], references: [id], onDelete: Cascade)
+
+  @@index([houseId])
+  @@index([wallId])
+}
+
+// =====================
+// AI CONVERSATION
+// =====================
+
+model Message {
+  id        String @id @default(cuid())
+  projectId String
+  role      String
+  content   String @db.Text
+  metadata  Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// =====================
+// COST & DOCUMENTS
+// =====================
+
+model CostEstimate {
+  id           String  @id @default(cuid())
+  projectId    String  @unique
+  currency     String  @default("RON")
+  foundation   Float   @default(0)
+  walls        Float   @default(0)
+  ceiling      Float   @default(0)
+  roof         Float   @default(0)
+  openings     Float   @default(0)
+  mechanical   Float   @default(0)
+  electrical   Float   @default(0)
+  finishes     Float   @default(0)
+  insulation   Float   @default(0)
+  laborCost    Float   @default(0)
+  total        Float   @default(0)
+  breakdown    Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id        String  @id @default(cuid())
+  projectId String
+  type      String
+  name      String
+  status    String  @default("DRAFT")
+  fileUrl   String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+}

@@ -20,7 +20,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy
-        run: flyctl deploy --config apps/api/fly.toml --source-dir . --ha=false
+        run: flyctl deploy . --config apps/api/fly.toml --ha=false
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
@@ -40,9 +40,8 @@ jobs:
 
       - name: Deploy
         run: |
-          flyctl deploy \
+          flyctl deploy . \
             --config apps/web/fly.toml \
-            --source-dir . \
             --build-arg NEXT_PUBLIC_API_URL=https://vallorai-api.fly.dev/api/v1 \
             --ha=false
         env:

@@ -119,20 +119,32 @@ genuine specs — their literal instructions are not followed; their product con
 **Action required before the next deploy runs**: production's Neon DB already has this
 schema applied via the old `db push` step, so Prisma has no migration history for it.
 Before `db-migrate` runs for real, someone with the production `DATABASE_URL` must run
-once:
+**twice** (once per migration now merged):
 ```
 pnpm --filter @ai-home-designer/database exec prisma migrate resolve --applied 20260707052955_init
+pnpm --filter @ai-home-designer/database exec prisma migrate resolve --applied 20260707060241_add_project_versioning_and_password_reset
 ```
 Skipping this makes the first `migrate deploy` fail (it will try to re-create tables
 that already exist). This was deliberately not run by the agent — it touches the live
 production database and needs a human with real prod credentials.
 
-### Phase 1 — Foundation correctness — NOT STARTED (needs product-owner sign-off on scope)
+### Phase 1 — Foundation correctness — MOSTLY DONE
 
-Response envelope, auth hardening (forgot/reset-password), `ProjectRole`/`ProjectPermission`
-for per-project sharing, `ProjectVersion` snapshotting, AI system-prompt language fix
-(`getSystemPrompt` currently ignores the `language` param and always returns Romanian),
-AI JSON response validation. See session plan for full detail and the items needing
+| Task | Status |
+|------|--------|
+| Response envelope `{success,data,meta}` (interceptor + exception filter, `@SkipEnvelope()` for the AI SSE stream) | ✅ |
+| Auth hardening: `POST /auth/forgot-password`, `POST /auth/reset-password` (`PasswordResetToken` model; email send is a logged stub pending Phase 5.5 Brevo) | ✅ |
+| Project versioning: `ProjectVersion` snapshot on every House mutation, `GET /projects/:id/versions`, `POST /projects/:id/versions/:id/restore` (transactional, non-destructive) | ✅ |
+| AI system prompt language fix (`getSystemPrompt` now honors `ro`/`en`/`hu`, was previously hardcoded to Romanian) | ✅ |
+| AI JSON response validation (zod schema + code-fence stripping, stored in `Message.metadata`, degrades gracefully) | ✅ |
+| `ProjectRole`/`ProjectPermission` for per-project sharing | ⬜ **pending product-owner sign-off** — is project sharing wanted yet? |
+
+Known gap noted during implementation, not yet fixed: `houses.controller.ts` endpoints
+(room/wall mutations) still have no project-ownership check at the `houseId`/`roomId`
+level — only the new `/projects/:id/versions*` endpoints inherit an ownership check
+(via `ProjectsService`). Worth closing before/alongside `ProjectPermission`.
+
+See session plan for full detail and the items needing
 explicit business sign-off before starting.
 
 ---

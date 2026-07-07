@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import type { House } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
@@ -33,10 +34,43 @@ function houseBounds(house: House) {
   }
 }
 
-export function HouseScene({ house }: { house: House }) {
+/** Rolling FPS readout for the debug overlay, refreshed every half second. */
+function useFps(): number | null {
+  const [fps, setFps] = useState<number | null>(null)
+  const frames = useRef(0)
+  const windowStart = useRef(0)
+
+  useFrame(() => {
+    const now = performance.now()
+    if (windowStart.current === 0) windowStart.current = now
+    frames.current++
+    const elapsed = now - windowStart.current
+    if (elapsed >= 500) {
+      setFps(Math.round((frames.current / elapsed) * 1000))
+      frames.current = 0
+      windowStart.current = now
+    }
+  })
+
+  return fps
+}
+
+interface HouseSceneProps {
+  house: House
+  /**
+   * Set when the browser has no hardware acceleration (or frame rate
+   * collapsed) — the brick-detail tier is withheld so the view stays fluid,
+   * and the overlay explains why.
+   */
+  lowPerfMode?: boolean
+}
+
+export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const { t } = useTranslation()
   const { centerX, centerZ } = useMemo(() => houseBounds(house), [house])
-  const lodTier = useLOD()
+  const rawTier = useLOD()
+  const lodTier = lowPerfMode && rawTier === 'detail' ? 'medium' : rawTier
+  const fps = useFps()
   const { pools, brickWalls, computing, totalBricks } = useBrickInstances(
     house,
     lodTier === 'detail',
@@ -56,12 +90,16 @@ export function HouseScene({ house }: { house: House }) {
       <Html fullscreen>
         <div className="absolute top-3 right-3 rounded-md bg-white/90 px-2.5 py-1 text-xs text-gray-500 shadow-sm pointer-events-none">
           {t.editor.viewer3d.lodLabel}: {lodTier}
+          {fps !== null && <> · {t.editor.viewer3d.fpsLabel}: {fps}</>}
           {lodTier === 'detail' && computing && <> · {t.editor.viewer3d.masonryComputing}</>}
           {showBricks && (
             <>
               {' '}
               · {t.editor.viewer3d.brickCountLabel}: {totalBricks.toLocaleString()}
             </>
+          )}
+          {lowPerfMode && (
+            <div className="mt-0.5 text-amber-600">{t.editor.viewer3d.lowPerfNotice}</div>
           )}
         </div>
       </Html>

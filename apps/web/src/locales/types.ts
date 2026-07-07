@@ -112,6 +112,8 @@ export interface Dictionary {
       lodLabel: string
       masonryComputing: string
       brickCountLabel: string
+      fpsLabel: string
+      lowPerfNotice: string
     }
   }
   aiChat: {

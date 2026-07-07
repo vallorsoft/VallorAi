@@ -115,6 +115,8 @@ export const hu = {
       lodLabel: 'Részletességi szint',
       masonryComputing: 'Falazat generálása…',
       brickCountLabel: 'Téglák',
+      fpsLabel: 'FPS',
+      lowPerfNotice: 'Hardveres gyorsítás nem érhető el — a falazat-részletek a gördülékenység érdekében ki vannak kapcsolva',
     },
   },
   aiChat: {

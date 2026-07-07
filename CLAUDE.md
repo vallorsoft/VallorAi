@@ -267,6 +267,18 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     not representative of real hardware (~3k instances in 3 draw calls is trivial for any
     GPU), so the 8m/25m LOD thresholds stand, but **re-check FPS on a real GPU before scaling
     to multi-floor houses** and tighten `LOD_NEAR_M` if needed.
+  - **Performance hardening (follow-up to the FPS finding above)**: `Viewer3D`'s Canvas now
+    requests the discrete GPU (`powerPreference: 'high-performance'`) and scales resolution
+    adaptively — drei `PerformanceMonitor` raises `dpr` to the display's native ratio on
+    machines that hold frame rate and drops it to 1 on ones that don't. If the browser has
+    **no hardware acceleration at all** (SwiftShader/llvmpipe/Basic Render detected via
+    `WEBGL_debug_renderer_info`, or `PerformanceMonitor` `onFallback` fires), the viewer
+    latches a low-perf mode: the brick-detail LOD tier is withheld (boxes stay smooth) and an
+    i18n'd notice (`viewer3d.lowPerfNotice`) explains why. A rolling FPS readout
+    (`viewer3d.fpsLabel`) joined the debug overlay. E2E escape hatch for headless/software-GL
+    test browsers: `localStorage['viewer3d.ignoreLowPerf'] = '1'` skips the latch (this is how
+    the brick path stays browser-verifiable in CI containers — both paths verified: default
+    run stays at `medium` with the notice, override run renders the 2,774 bricks).
 
 ### Next (Steps 7–9, not started)
 

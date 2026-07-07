@@ -1,9 +1,14 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
+import * as crypto from 'crypto'
 import { UsersService } from '../users/users.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
+import { ForgotPasswordDto } from './dto/forgot-password.dto'
+import { ResetPasswordDto } from './dto/reset-password.dto'
+
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
 
 @Injectable()
 export class AuthService {
@@ -45,6 +50,40 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid refresh token')
     }
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const genericResponse = { message: 'If that email exists, a reset link has been sent.' }
+
+    const user = await this.usersService.findByEmail(dto.email)
+    if (!user) return genericResponse // don't leak whether the email is registered
+
+    const token = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS)
+    await this.usersService.createPasswordResetToken(user.id, token, expiresAt)
+
+    this.sendPasswordResetEmail(user.email, token)
+
+    return genericResponse
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const resetToken = await this.usersService.findPasswordResetToken(dto.token)
+    if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+      throw new UnauthorizedException('Invalid or expired reset token')
+    }
+
+    const hashed = await bcrypt.hash(dto.newPassword, 12)
+    await this.usersService.updatePassword(resetToken.userId, hashed)
+    await this.usersService.invalidateUnusedPasswordResetTokens(resetToken.userId)
+
+    return { message: 'Password has been reset successfully.' }
+  }
+
+  // Stub pending the Brevo transactional email integration (Phase 5.5 in PROGRESS.md).
+  // For now this just logs the reset link so the flow can be exercised locally/manually.
+  private sendPasswordResetEmail(email: string, token: string) {
+    console.log(`[auth] Password reset requested for ${email}. Reset token: ${token}`)
   }
 
   private issueTokens(userId: string, email: string, role: string) {

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport'
 import { HousesService } from './houses.service'
@@ -21,27 +21,43 @@ export class HousesController {
   }
 
   @Post(':id/rooms')
-  addRoom(@Param('id') houseId: string, @Body() body: object) {
-    return this.housesService.addRoom(houseId, body as never)
+  addRoom(
+    @Param('id') houseId: string,
+    @Body() body: object,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.housesService.addRoom(houseId, body as never, req.user.id)
   }
 
   @Patch('rooms/:id')
-  updateRoom(@Param('id') roomId: string, @Body() body: object) {
-    return this.housesService.updateRoom(roomId, body)
+  updateRoom(
+    @Param('id') roomId: string,
+    @Body() body: object,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.housesService.updateRoom(roomId, body, req.user.id)
   }
 
   @Delete('rooms/:id')
-  removeRoom(@Param('id') roomId: string) {
-    return this.housesService.removeRoom(roomId)
+  removeRoom(@Param('id') roomId: string, @Request() req: { user: { id: string } }) {
+    return this.housesService.removeRoom(roomId, req.user.id)
   }
 
   @Post(':id/walls')
-  addWall(@Param('id') houseId: string, @Body() body: object) {
-    return this.housesService.addWall(houseId, body as never)
+  addWall(
+    @Param('id') houseId: string,
+    @Body() body: object,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.housesService.addWall(houseId, body as never, req.user.id)
   }
 
   @Patch('walls/:id')
-  updateWall(@Param('id') wallId: string, @Body() body: object) {
-    return this.housesService.updateWall(wallId, body)
+  updateWall(
+    @Param('id') wallId: string,
+    @Body() body: object,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.housesService.updateWall(wallId, body, req.user.id)
   }
 }

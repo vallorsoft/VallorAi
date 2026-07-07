@@ -70,4 +70,18 @@ export class ProjectsController {
   ) {
     return this.projectsService.updateBudget(id, req.user.id, body)
   }
+
+  @Get(':id/versions')
+  listVersions(@Param('id') id: string, @Request() req: { user: { id: string } }) {
+    return this.projectsService.listVersions(id, req.user.id)
+  }
+
+  @Post(':id/versions/:versionId/restore')
+  restoreVersion(
+    @Param('id') id: string,
+    @Param('versionId') versionId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectsService.restoreVersion(id, versionId, req.user.id)
+  }
 }

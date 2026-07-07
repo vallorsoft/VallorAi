@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
+import { ValidationPipe } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
+import { ResponseEnvelopeInterceptor } from '../src/common/interceptors/response-envelope.interceptor'
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 
 describe('AppModule (e2e)', () => {
   let app: NestFastifyApplication
@@ -13,6 +17,15 @@ describe('AppModule (e2e)', () => {
 
     app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter())
     app.setGlobalPrefix('api/v1')
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    )
+    app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(app.get(Reflector)))
+    app.useGlobalFilters(new HttpExceptionFilter())
     await app.init()
     await app.getHttpAdapter().getInstance().ready()
   })
@@ -33,7 +46,19 @@ describe('AppModule (e2e)', () => {
       .send({ email, password: 'Sup3rSecret!', name: 'Smoke Test' })
       .expect(201)
 
-    expect(response.body).toHaveProperty('accessToken')
-    expect(response.body).toHaveProperty('refreshToken')
+    expect(response.body.success).toBe(true)
+    expect(response.body.data).toHaveProperty('accessToken')
+    expect(response.body.data).toHaveProperty('refreshToken')
+  })
+
+  it('returns a normalized validation error for an invalid registration payload', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({ email: 'not-an-email', password: 'Sup3rSecret!', name: 'Smoke Test' })
+      .expect(400)
+
+    expect(response.body.success).toBe(false)
+    expect(response.body.error).toHaveProperty('code', 'VALIDATION_FAILED')
+    expect(response.body.error).toHaveProperty('message')
   })
 })

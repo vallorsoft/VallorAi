@@ -37,3 +37,6 @@ coverage
 
 # Prisma
 packages/database/src/generated
+
+# TypeScript incremental build info
+*.tsbuildinfo

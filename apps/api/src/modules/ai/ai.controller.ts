@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport'
 import { Observable } from 'rxjs'
 import { AiService } from './ai.service'
+import { SkipEnvelope } from '../../common/decorators/skip-envelope.decorator'
 
 @ApiTags('ai')
 @ApiBearerAuth()
@@ -20,6 +21,7 @@ export class AiController {
   }
 
   @Sse('projects/:id/stream')
+  @SkipEnvelope()
   stream(
     @Param('id') projectId: string,
     @Body() body: { message: string; language?: string },

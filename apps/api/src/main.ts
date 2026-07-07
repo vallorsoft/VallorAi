@@ -1,8 +1,10 @@
-import { NestFactory } from '@nestjs/core'
+import { NestFactory, Reflector } from '@nestjs/core'
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify'
 import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { AppModule } from './app.module'
+import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor'
+import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -24,6 +26,9 @@ async function bootstrap() {
       transform: true,
     }),
   )
+
+  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(app.get(Reflector)))
+  app.useGlobalFilters(new HttpExceptionFilter())
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()

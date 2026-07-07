@@ -29,8 +29,8 @@ export function RegisterForm() {
       await api.post('/auth/register', { ...data, language: 'ro', country: 'RO' })
       setSubmitted(true)
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } } }
-      setError(err?.response?.data?.message ?? 'Înregistrare eșuată')
+      const err = e as { response?: { data?: { error?: { message?: string } } } }
+      setError(err?.response?.data?.error?.message ?? 'Înregistrare eșuată')
     }
   }
 

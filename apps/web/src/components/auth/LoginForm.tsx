@@ -36,10 +36,10 @@ export function LoginForm() {
       setTokens(res.data.accessToken, res.data.refreshToken)
       router.push('/projects')
     } catch (e: unknown) {
-      const err = e as { response?: { status?: number; data?: { message?: string } } }
+      const err = e as { response?: { status?: number; data?: { error?: { message?: string } } } }
       if (err.response?.status === 403) {
         setUnverifiedEmail(getValues('email'))
-        setError(err.response?.data?.message ?? 'Email neconfirmat')
+        setError(err.response?.data?.error?.message ?? 'Email neconfirmat')
       } else {
         setError('Email sau parolă incorectă')
       }

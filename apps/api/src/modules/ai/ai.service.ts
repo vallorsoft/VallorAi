@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AIGateway } from '@ai-home-designer/ai-gateway'
-import { prisma } from '@ai-home-designer/database'
-import { SYSTEM_PROMPT_RO } from './prompts/system.prompt'
+import { prisma, Prisma } from '@ai-home-designer/database'
+import { getSystemPromptForLanguage } from './prompts/system.prompt'
+import { parseDesignResponse } from './schemas/design-response.schema'
 
 @Injectable()
 export class AiService {
@@ -53,7 +54,12 @@ export class AiService {
     const result = await this.gateway.complete({ messages })
 
     await prisma.message.create({
-      data: { projectId, role: 'assistant', content: result.content },
+      data: {
+        projectId,
+        role: 'assistant',
+        content: result.content,
+        metadata: this.buildAssistantMetadata(result.content),
+      },
     })
 
     return { response: result.content, provider: result.provider }
@@ -80,7 +86,14 @@ export class AiService {
       yield chunk
     }
 
-    await prisma.message.create({ data: { projectId, role: 'assistant', content: fullResponse } })
+    await prisma.message.create({
+      data: {
+        projectId,
+        role: 'assistant',
+        content: fullResponse,
+        metadata: this.buildAssistantMetadata(fullResponse),
+      },
+    })
   }
 
   getConversation(projectId: string) {
@@ -91,7 +104,20 @@ export class AiService {
   }
 
   private getSystemPrompt(language: string): string {
-    if (language === 'ro') return SYSTEM_PROMPT_RO
-    return SYSTEM_PROMPT_RO
+    return getSystemPromptForLanguage(language)
+  }
+
+  /**
+   * Attempts to parse the assistant's raw content as a structured design
+   * response. Never throws: on success, returns the parsed object so it can
+   * be stored alongside the raw content; on failure, returns a small
+   * validationError marker for debugging without breaking the chat flow.
+   */
+  private buildAssistantMetadata(rawContent: string): Prisma.InputJsonValue {
+    const parsed = parseDesignResponse(rawContent)
+    if (parsed.success) {
+      return { ...parsed.data } as Prisma.InputJsonValue
+    }
+    return { validationError: parsed.error } as Prisma.InputJsonValue
   }
 }

@@ -31,9 +31,9 @@ export function VerifyEmailHandler() {
         setTimeout(() => router.push('/projects'), 1500)
       })
       .catch((e: unknown) => {
-        const err = e as { response?: { data?: { message?: string } } }
+        const err = e as { response?: { data?: { error?: { message?: string } } } }
         setStatus('error')
-        setError(err.response?.data?.message ?? 'Confirmarea a eșuat')
+        setError(err.response?.data?.error?.message ?? 'Confirmarea a eșuat')
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

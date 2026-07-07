@@ -90,31 +90,92 @@
 |------|--------|
 | `fly.toml` for API + web deployment | ✅ |
 | `Dockerfile.api` + `Dockerfile.web` | ✅ |
-| GitHub Actions CI/CD pipeline (db-push → deploy-api → deploy-web) | ✅ |
+| GitHub Actions CI/CD pipeline (db-migrate → deploy-api → deploy-web) | ✅ |
 | Neon DB connection + `prisma db push` (13 tables live) | ✅ |
 | Workspace packages compiled to JS for runtime (fixed API crash-loop) | ✅ |
 | Cloudflare R2 storage integration | ⬜ |
 
 ---
 
-## Phase 5.5 — Email (Brevo) — IN PROGRESS
+## Spec audit & roadmap (2026-07-07)
 
-Registration currently issues JWT tokens immediately with no email step at all.
-Target: full email verification before first login, using Brevo as the transactional
+13 PDF specs uploaded to `docs/materials/` were processed and cross-checked against
+the codebase (see `Master p.PDF`/`Master 2.PDF` note below). A phased roadmap was
+produced reconciling the specs' vision with what's actually built; full detail lives
+in the session's plan, condensed here as Phase 0/1 below. Two files
+(`Master p.PDF`, `Master 2.PDF`) contain AI-agent prompt-injection style text, not
+genuine specs — their literal instructions are not followed; their product content
+(manufacturer schema etc.) is noted only as background for a future marketplace phase.
+
+### Phase 0 — Baseline hygiene — DONE
+
+| Task | Status |
+|------|--------|
+| Real Prisma migrations (`packages/database/prisma/migrations/`, baselined as `20260707052955_init`) | ✅ |
+| Jest unit test harness for `apps/api` (`RulesService` coverage) | ✅ |
+| Jest e2e smoke test harness for `apps/api` (auth guard + register flow) | ✅ |
+| CI: `db-push` job replaced with `db-migrate` (`prisma migrate deploy`) | ✅ (code) — **manual one-time step still required**, see below |
+
+**Action required before the next deploy runs**: production's Neon DB already has the
+`init` schema plus the email-verification columns (both applied via the old `db push`
+step — the latter from #22/#23). Prisma has no migration history for either yet. Before
+`db-migrate` runs for real, resolve these two (via the "Baseline Prisma Migrations"
+manual workflow, or by hand with the production `DATABASE_URL`):
+```
+pnpm --filter @ai-home-designer/database exec prisma migrate resolve --applied 20260707052955_init
+pnpm --filter @ai-home-designer/database exec prisma migrate resolve --applied 20260707055000_add_email_verification
+```
+Do **not** resolve `20260707060241_add_project_versioning_and_password_reset` — those
+tables are genuinely new and must be created for real by `migrate deploy`. Skipping the
+two resolves above makes the first `migrate deploy` fail (it will try to re-create
+tables/columns that already exist). This was deliberately not run by the agent — it
+touches the live production database and needs a human with real prod credentials (or
+the manual GitHub Actions workflow, which uses the existing `DATABASE_URL` secret).
+
+### Phase 1 — Foundation correctness — MOSTLY DONE
+
+| Task | Status |
+|------|--------|
+| Response envelope `{success,data,meta}` (interceptor + exception filter, `@SkipEnvelope()` for the AI SSE stream) | ✅ |
+| Auth hardening: `POST /auth/forgot-password`, `POST /auth/reset-password` (`PasswordResetToken` model; email send is a logged stub pending Phase 5.5 Brevo) | ✅ |
+| Project versioning: `ProjectVersion` snapshot on every House mutation, `GET /projects/:id/versions`, `POST /projects/:id/versions/:id/restore` (transactional, non-destructive) | ✅ |
+| AI system prompt language fix (`getSystemPrompt` now honors `ro`/`en`/`hu`, was previously hardcoded to Romanian) | ✅ |
+| AI JSON response validation (zod schema + code-fence stripping, stored in `Message.metadata`, degrades gracefully) | ✅ |
+| `ProjectRole`/`ProjectPermission` for per-project sharing | ⬜ **pending product-owner sign-off** — is project sharing wanted yet? |
+
+Known gap noted during implementation, not yet fixed: `houses.controller.ts` endpoints
+(room/wall mutations) still have no project-ownership check at the `houseId`/`roomId`
+level — only the new `/projects/:id/versions*` endpoints inherit an ownership check
+(via `ProjectsService`). Worth closing before/alongside `ProjectPermission`.
+
+See session plan for full detail and the items needing
+explicit business sign-off before starting.
+
+---
+
+## Phase 5.5 — Email (Brevo) — DONE (merged via #22/#23, in parallel with the spec-audit work above)
+
+Full email verification before first login, using Brevo as the transactional
 email provider. **Emails go out using Brevo's own default/system sender template
 for now** — no custom HTML design yet. Swapping in a branded Romanian-language
 template is a separate, later task once the product has real users.
 
 | Task | Status |
 |------|--------|
-| Add `verificationToken` + `verificationTokenExpiresAt` to `User` model | ⬜ |
-| `MailModule`/`MailService` — thin wrapper over Brevo's transactional email REST API (`api.brevo.com/v3/smtp/email`), no new SDK dependency (uses native `fetch`) | ⬜ |
-| `register()`: create user as unverified, generate token, send verification email, do **not** issue JWT yet — return a "check your email" response instead | ⬜ |
-| `login()`: reject with a clear error if `isVerified` is false | ⬜ |
-| `POST /auth/verify-email` — validates token + expiry, sets `isVerified = true`, issues JWT tokens | ⬜ |
-| `POST /auth/resend-verification` — regenerates token, resends email (covers expired/lost emails) | ⬜ |
-| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` — Fly.io secrets + `.env.example` | ⬜ |
-| Web: `/verify-email?token=...` page that calls the endpoint and logs the user in on success | ⬜ |
+| Add `verificationToken` + `verificationTokenExpiresAt` to `User` model | ✅ |
+| `MailModule`/`MailService` — thin wrapper over Brevo's transactional email REST API (`api.brevo.com/v3/smtp/email`), no new SDK dependency (uses native `fetch`) | ✅ |
+| `register()`: create user as unverified, generate token, send verification email, do **not** issue JWT yet — return a "check your email" response instead | ✅ |
+| `login()`: reject with a clear error if `isVerified` is false | ✅ |
+| `POST /auth/verify-email` — validates token + expiry, sets `isVerified = true`, issues JWT tokens | ✅ |
+| `POST /auth/resend-verification` — regenerates token, resends email (covers expired/lost emails) | ✅ |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` — Fly.io secrets + `.env.example` | ✅ |
+| Web: `/verify-email?token=...` page that calls the endpoint and logs the user in on success | ✅ |
+
+Note: this branched (via `db push --accept-data-loss`) at the same time as the spec-audit
+Phase 0/1 work above, which independently moved to real Prisma migrations. The
+`verificationToken`/`verificationTokenExpiresAt` columns were folded into the migration
+history as `20260707055000_add_email_verification` (sequenced between `init` and the
+versioning migration to match what's actually on production) when the two branches merged.
 
 ---
 

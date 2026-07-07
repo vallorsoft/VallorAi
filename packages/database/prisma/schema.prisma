@@ -49,6 +49,7 @@ model User {
 
   projects  Project[]
   sessions  Session[]
+  passwordResetTokens PasswordResetToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,6 +62,20 @@ model Session {
   userId    String
   token     String   @unique
   expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -107,6 +122,8 @@ model Project {
   messages    Message[]
   documents   Document[]
   costEstimate CostEstimate?
+  versions    ProjectVersion[]
+  currentVersionId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,6 +220,24 @@ model House {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// =====================
+// PROJECT VERSIONING
+// =====================
+
+model ProjectVersion {
+  id        String   @id @default(cuid())
+  projectId String
+  snapshot  Json
+  label     String?
+  createdBy String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
 }
 
 model Room {

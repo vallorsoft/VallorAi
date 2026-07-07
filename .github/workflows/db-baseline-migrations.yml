@@ -1,0 +1,54 @@
+name: Baseline Prisma Migrations (one-time)
+
+# Manually-triggered only. Marks migrations that were already applied to the
+# production database (via the old `prisma db push` step) as resolved in
+# Prisma's migration history table, WITHOUT running any schema-changing SQL.
+# This must run once before the deploy workflow's `db-migrate` job can use
+# `prisma migrate deploy` successfully — otherwise it will try to re-create
+# tables/columns that already exist and fail.
+#
+# IMPORTANT: only list migrations here that production ALREADY has (applied
+# piecemeal via the old `db push` step: the original schema, then the
+# email-verification columns from #22/#23). Do NOT add
+# `20260707060241_add_project_versioning_and_password_reset` here — those
+# tables are genuinely new and must be created for real by the normal
+# deploy workflow's `prisma migrate deploy` step, not baselined as if they
+# already existed.
+#
+# Safe to re-run: `migrate resolve --applied` on an already-resolved migration
+# is a no-op.
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: "Migration folder name to mark as already applied (production only has schema up through email verification — do NOT baseline the versioning migration)"
+        required: true
+        type: choice
+        options:
+          - "20260707052955_init"
+          - "20260707055000_add_email_verification"
+
+jobs:
+  resolve:
+    name: Resolve migration against production DB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.1.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Mark migration as applied
+        run: pnpm --filter @ai-home-designer/database exec prisma migrate resolve --applied "${{ inputs.migration }}"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

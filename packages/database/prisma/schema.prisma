@@ -212,9 +212,10 @@ model House {
   roofType   String @default("GABLED")
   version    Int    @default(1)
 
-  rooms    Room[]
-  walls    Wall[]
-  openings Opening[]
+  rooms       Room[]
+  walls       Wall[]
+  openings    Opening[]
+  foundations Foundation[]
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -275,6 +276,9 @@ model Wall {
   house    House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
   openings Opening[]
 
+  assemblyLayers     AssemblyLayer[]
+  reinforcementSpecs ReinforcementSpec[]
+
   @@index([houseId])
 }
 
@@ -294,6 +298,131 @@ model Opening {
 
   @@index([houseId])
   @@index([wallId])
+}
+
+// =====================
+// MATERIALS & LAYERED ASSEMBLIES (BIM-level detail)
+// =====================
+// AssemblyLayer/ReinforcementSpec use a nullable-FK-per-parent-type shape
+// (wallId? / foundationId?) rather than a single polymorphic elementType+id
+// pair, so referential integrity and cascade deletes stay real Postgres FKs.
+// A CHECK constraint (added via raw SQL in the migration, since Prisma has
+// no first-class polymorphic relations) enforces "exactly one parent set".
+
+enum MaterialCategory {
+  BRICK
+  BLOCK
+  CONCRETE
+  REBAR
+  MORTAR
+  INSULATION
+  RENDER
+  PLASTER
+  PAINT
+}
+
+enum MaterialUnit {
+  M2
+  M3
+  BUC
+  KG
+  ML
+}
+
+enum MaterialSource {
+  GENERIC_DEFAULT
+  MANUFACTURER
+}
+
+enum LayerFunction {
+  STRUCTURAL
+  INSULATION
+  RENDER
+  FINISH
+  PAINT
+}
+
+enum RebarRole {
+  LONGITUDINAL
+  STIRRUP
+}
+
+model Material {
+  id             String           @id @default(cuid())
+  category       MaterialCategory
+  name           String
+  standardRef    String?
+  unit           MaterialUnit
+  unitCostRON    Float
+  specSheet      Json
+  source         MaterialSource   @default(GENERIC_DEFAULT)
+  supplierId     String?
+  priceUpdatedAt DateTime         @default(now())
+
+  assemblyLayers AssemblyLayer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([supplierId])
+}
+
+model Foundation {
+  id            String @id @default(cuid())
+  houseId       String
+  depthMm       Float
+  widthMm       Float
+  concreteClass String
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  assemblyLayers     AssemblyLayer[]
+  reinforcementSpecs ReinforcementSpec[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([houseId])
+}
+
+model AssemblyLayer {
+  id           String        @id @default(cuid())
+  wallId       String?
+  foundationId String?
+  order        Int
+  materialId   String
+  thicknessMm  Float
+  function     LayerFunction
+
+  wall       Wall?       @relation(fields: [wallId], references: [id], onDelete: Cascade)
+  foundation Foundation? @relation(fields: [foundationId], references: [id], onDelete: Cascade)
+  material   Material    @relation(fields: [materialId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([wallId])
+  @@index([foundationId])
+  @@index([materialId])
+}
+
+model ReinforcementSpec {
+  id            String    @id @default(cuid())
+  wallId        String?
+  foundationId  String?
+  role          RebarRole
+  barDiameterMm Float
+  spacingMm     Float
+  coverMm       Float
+  concreteClass String
+
+  wall       Wall?       @relation(fields: [wallId], references: [id], onDelete: Cascade)
+  foundation Foundation? @relation(fields: [foundationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([wallId])
+  @@index([foundationId])
 }
 
 // =====================

@@ -15,7 +15,11 @@ export class AiService {
       providers: {
         GEMINI: {
           apiKey: config.get('GEMINI_API_KEY') ?? '',
-          model: config.get('GEMINI_MODEL') ?? 'gemini-1.5-pro',
+          // gemini-1.5-pro was retired by Google (404s on generateContent as of
+          // mid-2026) — gemini-flash-latest is Google's maintained alias to
+          // their current recommended flash model, so it won't go stale the
+          // same way a pinned dated model name eventually will.
+          model: config.get('GEMINI_MODEL') ?? 'gemini-flash-latest',
         },
         CLAUDE: {
           apiKey: config.get('ANTHROPIC_API_KEY') ?? '',

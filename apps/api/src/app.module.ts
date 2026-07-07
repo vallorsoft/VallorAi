@@ -9,6 +9,7 @@ import { HousesModule } from './modules/houses/houses.module'
 import { RulesModule } from './modules/rules/rules.module'
 import { CostsModule } from './modules/costs/costs.module'
 import { ExportsModule } from './modules/exports/exports.module'
+import { SettingsModule } from './modules/settings/settings.module'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ExportsModule } from './modules/exports/exports.module'
     RulesModule,
     CostsModule,
     ExportsModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

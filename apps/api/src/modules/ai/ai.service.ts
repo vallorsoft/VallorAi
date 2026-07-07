@@ -1,15 +1,25 @@
-import { Injectable } from '@nestjs/common'
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { AIGateway } from '@ai-home-designer/ai-gateway'
+import {
+  AIGateway,
+  AIQuotaExceededError,
+  type AICompletionResult,
+  type AIMessage,
+  type ProviderName,
+} from '@ai-home-designer/ai-gateway'
 import { prisma, Prisma } from '@ai-home-designer/database'
 import { getSystemPromptForLanguage } from './prompts/system.prompt'
 import { parseDesignResponse } from './schemas/design-response.schema'
+import { SettingsService } from '../settings/settings.service'
 
 @Injectable()
 export class AiService {
   private readonly gateway: AIGateway
 
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private readonly settingsService: SettingsService,
+  ) {
     this.gateway = new AIGateway({
       defaultProvider: (config.get('AI_PROVIDER') as never) ?? 'GEMINI',
       providers: {
@@ -27,7 +37,9 @@ export class AiService {
         },
         OPENAI: {
           apiKey: config.get('OPENAI_API_KEY') ?? '',
-          model: config.get('OPENAI_MODEL') ?? 'gpt-4o',
+          // gpt-4o still works via the API but is no longer OpenAI's
+          // recommended default — gpt-5.5 is, as of mid-2026.
+          model: config.get('OPENAI_MODEL') ?? 'gpt-5.5',
         },
       },
     })
@@ -55,7 +67,7 @@ export class AiService {
       data: { projectId, role: 'user', content: userMessage },
     })
 
-    const result = await this.gateway.complete({ messages })
+    const result = await this.completeWithQuotaFallback(messages)
 
     await prisma.message.create({
       data: {
@@ -85,9 +97,24 @@ export class AiService {
     await prisma.message.create({ data: { projectId, role: 'user', content: userMessage } })
 
     let fullResponse = ''
-    for await (const chunk of this.gateway.stream({ messages })) {
-      fullResponse += chunk
-      yield chunk
+    let yieldedAny = false
+    try {
+      for await (const chunk of this.gateway.stream({ messages })) {
+        yieldedAny = true
+        fullResponse += chunk
+        yield chunk
+      }
+    } catch (err) {
+      // Only safe to retry on a different provider if nothing has reached
+      // the client yet — once part of a response is already streamed out,
+      // there's no clean way to "take it back" and restart elsewhere.
+      if (yieldedAny || !(err instanceof AIQuotaExceededError)) throw err
+      const fallbackProvider = await this.resolvePaidFallback(err.provider)
+      if (!fallbackProvider) throw this.quotaExceededException()
+      for await (const chunk of this.gateway.stream({ messages, provider: fallbackProvider })) {
+        fullResponse += chunk
+        yield chunk
+      }
     }
 
     await prisma.message.create({
@@ -109,6 +136,35 @@ export class AiService {
 
   private getSystemPrompt(language: string): string {
     return getSystemPromptForLanguage(language)
+  }
+
+  private async completeWithQuotaFallback(messages: AIMessage[]): Promise<AICompletionResult> {
+    try {
+      return await this.gateway.complete({ messages })
+    } catch (err) {
+      if (!(err instanceof AIQuotaExceededError)) throw err
+      const fallbackProvider = await this.resolvePaidFallback(err.provider)
+      if (!fallbackProvider) throw this.quotaExceededException()
+      return this.gateway.complete({ messages, provider: fallbackProvider })
+    }
+  }
+
+  /** Only offers a fallback when a SUPERADMIN has explicitly opted into paid
+   * providers AND a different provider actually has a real API key
+   * configured — otherwise there's nothing sensible to fall back to. */
+  private async resolvePaidFallback(exhaustedProvider: string): Promise<ProviderName | undefined> {
+    const settings = await this.settingsService.getAiSettings()
+    if (!settings.allowPaidAiProviders) return undefined
+    return this.gateway
+      .configuredProviders()
+      .find((provider) => provider !== exhaustedProvider.toUpperCase())
+  }
+
+  private quotaExceededException(): HttpException {
+    return new HttpException(
+      'AI free-tier quota exceeded. Please try again later.',
+      HttpStatus.SERVICE_UNAVAILABLE,
+    )
   }
 
   /**

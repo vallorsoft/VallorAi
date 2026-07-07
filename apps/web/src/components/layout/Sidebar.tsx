@@ -5,17 +5,22 @@ import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/useTranslation'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 
 export function Sidebar() {
   const pathname = usePathname()
   const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
   const { t } = useTranslation()
+  const { data: currentUser } = useCurrentUser()
 
   const navItems = [
     { href: '/projects', label: t.sidebar.projects, icon: '🏠' },
     { href: '/marketplace', label: t.sidebar.marketplace, icon: '🛒' },
     { href: '/settings', label: t.sidebar.settings, icon: '⚙️' },
+    ...(currentUser?.role === 'SUPERADMIN'
+      ? [{ href: '/admin/ai-settings', label: t.adminAiSettings.title, icon: '' }]
+      : []),
   ]
 
   const handleLogout = () => {

@@ -1,4 +1,6 @@
 export * from './interface'
+export * from './errors'
 export * from './adapters/claude'
 export * from './adapters/openai'
+export * from './adapters/gemini'
 export * from './gateway'

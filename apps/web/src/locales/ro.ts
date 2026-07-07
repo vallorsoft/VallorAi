@@ -120,6 +120,7 @@ export const ro = {
     greeting2: 'Spune-mi despre casa pe care vrei să o proiectezi.',
     placeholder: 'Descrie-ți casa visurilor...',
     error: 'Eroare la comunicarea cu AI-ul. Încearcă din nou.',
+    quotaExceeded: 'Asistentul AI este momentan indisponibil (limită gratuită atinsă). Încearcă din nou mai târziu.',
   },
   auth: {
     register: {
@@ -172,5 +173,17 @@ export const ro = {
     emailInvalid: 'Email invalid',
     passwordMin: 'Parola trebuie să aibă minim 8 caractere',
     passwordRequired: 'Parola este obligatorie',
+  },
+  adminAiSettings: {
+    title: 'Setări AI',
+    description:
+      'Controlează dacă asistentul AI poate trece la un furnizor cu plată atunci când limita gratuită (Gemini) este atinsă.',
+    toggleLabel: 'Permite furnizori AI cu plată ca rezervă',
+    toggleHintOn:
+      'Activat — dacă limita gratuită este atinsă și un furnizor cu plată este configurat, asistentul va continua să răspundă folosindu-l.',
+    toggleHintOff:
+      'Dezactivat — dacă limita gratuită este atinsă, asistentul afișează un mesaj de indisponibilitate temporară în loc să folosească un furnizor cu plată.',
+    saving: 'Se salvează...',
+    accessDenied: 'Nu ai acces la această pagină.',
   },
 } satisfies Dictionary

@@ -5,11 +5,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { api } from '@/lib/api'
 import { useTranslation } from '@/lib/useTranslation'
+import { appliedRoomFromMetadata, parseAssistantMessage } from '@/lib/parseAssistantMessage'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  metadata?: unknown
   createdAt: string
 }
 
@@ -22,6 +24,8 @@ export function AiChat({ projectId }: AiChatProps) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
+  const [rebuilding, setRebuilding] = useState(false)
+  const [rebuildStatus, setRebuildStatus] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
 
@@ -56,6 +60,27 @@ export function AiChat({ projectId }: AiChatProps) {
     }
   }
 
+  const rebuildFromConversation = async () => {
+    if (rebuilding) return
+    setRebuilding(true)
+    setRebuildStatus(null)
+    try {
+      const res = await api.post(`/ai/projects/${projectId}/rebuild`)
+      const appliedCount = res.data?.appliedCount ?? 0
+      setRebuildStatus(`${t.aiChat.rebuildDone}: ${appliedCount}`)
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['conversation', projectId] }),
+        qc.invalidateQueries({ queryKey: ['houses', projectId] }),
+      ])
+    } catch {
+      setRebuildStatus(t.aiChat.rebuildError)
+    } finally {
+      setRebuilding(false)
+    }
+  }
+
+  const hasAssistantReply = messages.some((m) => m.role === 'assistant')
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}
@@ -68,22 +93,31 @@ export function AiChat({ projectId }: AiChatProps) {
           </div>
         )}
 
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+        {messages.map((msg) => {
+          const appliedRoom = msg.role === 'assistant' ? appliedRoomFromMetadata(msg.metadata) : null
+          return (
             <div
-              className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-brand-500 text-white rounded-br-sm'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-sm'
-              }`}
+              key={msg.id}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              {msg.content}
+              <div
+                className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                  msg.role === 'user'
+                    ? 'bg-brand-500 text-white rounded-br-sm'
+                    : 'bg-gray-100 text-gray-800 rounded-bl-sm'
+                }`}
+              >
+                {msg.role === 'assistant' ? parseAssistantMessage(msg.content) : msg.content}
+                {appliedRoom && (
+                  <div className="mt-1.5 pt-1.5 border-t border-gray-200 text-xs text-gray-500">
+                    {appliedRoom.action === 'created' ? t.aiChat.roomAdded : t.aiChat.roomUpdated}:{' '}
+                    {appliedRoom.name} ({appliedRoom.area} m²)
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {sending && (
           <div className="flex justify-start">
@@ -110,6 +144,18 @@ export function AiChat({ projectId }: AiChatProps) {
 
       {/* Input */}
       <div className="border-t border-gray-100 p-3">
+        {hasAssistantReply && (
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <button
+              onClick={rebuildFromConversation}
+              disabled={rebuilding}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {rebuilding ? t.aiChat.rebuilding : t.aiChat.rebuildButton}
+            </button>
+            {rebuildStatus && <span className="text-xs text-gray-400">{rebuildStatus}</span>}
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             value={input}

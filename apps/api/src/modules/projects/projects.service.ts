@@ -18,8 +18,10 @@ export class ProjectsService {
   constructor(private readonly projectVersions: ProjectVersionsService) {}
 
   /** Lightweight ownership check — avoids findOne's heavy nested include when
-   *  callers only need to confirm the project exists and belongs to userId. */
-  private async assertOwnership(projectId: string, userId: string) {
+   *  callers only need to confirm the project exists and belongs to userId.
+   *  Public so other modules (e.g. AiModule) can reuse the same check instead
+   *  of duplicating it. */
+  async assertOwnership(projectId: string, userId: string) {
     const project = await prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
     if (project.userId !== userId) throw new ForbiddenException()

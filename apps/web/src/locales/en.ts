@@ -125,6 +125,12 @@ export const en = {
     placeholder: 'Describe your dream home...',
     error: 'Error communicating with the AI. Please try again.',
     quotaExceeded: 'The AI assistant is temporarily unavailable (free quota reached). Please try again later.',
+    roomAdded: 'Room added to the plan',
+    roomUpdated: 'Room updated in the plan',
+    rebuildButton: 'Build plan from conversation',
+    rebuilding: 'Building the plan...',
+    rebuildDone: 'Plan updated, rooms added',
+    rebuildError: 'Failed to build the plan. Please try again.',
   },
   auth: {
     register: {

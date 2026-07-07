@@ -125,6 +125,12 @@ export const hu = {
     placeholder: 'Írd le álmaid otthonát...',
     error: 'Hiba történt az AI-jal való kommunikáció során. Próbáld újra.',
     quotaExceeded: 'Az AI asszisztens jelenleg nem elérhető (elérte az ingyenes keretet). Próbáld újra később.',
+    roomAdded: 'Szoba hozzáadva a tervhez',
+    roomUpdated: 'Szoba frissítve a tervben',
+    rebuildButton: 'Terv felépítése a beszélgetésből',
+    rebuilding: 'Terv felépítése folyamatban...',
+    rebuildDone: 'Terv frissítve, szobák hozzáadva',
+    rebuildError: 'A terv felépítése sikertelen. Próbáld újra.',
   },
   auth: {
     register: {

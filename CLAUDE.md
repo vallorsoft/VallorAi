@@ -95,6 +95,54 @@ to the `SUPERADMIN` role (`RolesGuard`/`@Roles()` in `apps/api/src/common`) — 
 No user is seeded as `SUPERADMIN` — promote one by hand (`UPDATE "User" SET role = 'SUPERADMIN' WHERE
 email = '...'`) once this ships.
 
+### AI chat → actual House/Room data (fixed 2026-07-07)
+
+The AI's structured reply (`design-response.schema.ts`: `message` / `design_update` /
+`next_question` / `ai_justification` — the shape the system prompts instruct it to always
+return) was being parsed and saved to `Message.metadata`, but **`design_update` was never
+applied to the database** — the chat could talk through an entire house design without a single
+`Room` ever being created, and the raw JSON envelope was rendered verbatim in the chat bubble
+(no client-side parsing) instead of just `message`/`next_question`. A real user reported this as
+"the AI can't build what we discussed," which is exactly what was happening: the conversation
+was real, the plan was not.
+
+Fixed in `apps/api/src/modules/ai/`:
+- `design-update-mapper.ts` (pure, unit-tested) — `roomFromDesignUpdateData` maps one
+  `ADD_ROOM`/`UPDATE_ROOM` `data` payload (loosely typed — the prompt only sketches `data: {}`)
+  to concrete `Room` fields: RO/HU floor-name resolution (`parter`/`etaj`/`emelet`/…), a
+  placeholder rectangle from `suggested_area_sqm` alone (no floor-plan solver exists — see the
+  BIM-detail roadmap above), and `DEFAULT_ROOM_HEIGHT_M` matching `Wall.height`'s default.
+  `nextRoomPosition` lays each new room next to its floor's existing rooms, non-overlapping;
+  each floor's row is also offset in Y (`FLOOR_ROW_HEIGHT_M`) because `FloorPlanCanvas.tsx` has
+  no floor filter yet and draws every floor's rooms on the same flat view.
+- `AiService.applyDesignUpdate` — called after every chat turn now. `ADD_ROOM` creates a room;
+  `UPDATE_ROOM` looks for an existing room on the same floor with an exact `type` match and
+  updates it in place, else falls back to creating one (the AI's `room_type` wording drifts
+  between turns — e.g. `living_room` → `living_room_and_kitchen` — so an exact-match-or-create
+  heuristic is used rather than fuzzy-matching free text across turns; this can leave a stale
+  duplicate room the user deletes via the existing trash-icon action in `RoomPanel.tsx`).
+  Non-room updates (the AI's whole-house "global" style/summary turns, any `ADD_WALL` — never
+  observed to actually carry wall geometry) are safely skipped, not guessed at.
+- `AiService.rebuildFromConversation` (`POST /ai/projects/:id/rebuild`, "Construiește planul din
+  conversație" button in `AiChat.tsx`) replays the `design_update` already stored in every
+  assistant message's `metadata` and applies whichever ones weren't applied yet — idempotent
+  (an `appliedRoom` marker is written back onto each message once handled). This is what repairs
+  a project whose conversation happened before this fix shipped, without the user re-typing
+  anything: their prior `design_update` turns were always saved, just never used.
+- `apps/web/src/lib/parseAssistantMessage.ts` + `AiChat.tsx` — chat bubbles now show
+  `message`/`next_question`, not the raw JSON envelope; an `appliedRoom`-derived badge
+  ("Cameră adăugată/actualizată la plan" — `aiChat.roomAdded`/`roomUpdated`, all 3 locales)
+  confirms when a turn actually changed the plan.
+- Both `AiController` endpoints now thread `req.user.id` through and call the same
+  `ProjectsService.assertOwnership` the rest of the app uses (made public for this reuse) —
+  `chat`/`stream`/`conversation`/`rebuild` previously had no ownership check at all.
+
+Known pre-existing gaps this didn't touch: `FloorPlanCanvas.tsx` has no floor switcher (all
+floors render flat, hence the Y-offset placeholder above); the 3D viewer doesn't stack floors by
+elevation either; no walls are ever created from the AI conversation (the system prompt lists
+`ADD_WALL` as a possible action but the model has never been observed to emit one with usable
+geometry, and the manual "Adaugă perete" toolbar mode isn't wired to the API yet regardless).
+
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:
 - `apps/web/src/locales/types.ts` — the `Dictionary` interface (single source of truth for shape) + `LOCALES`/`DEFAULT_LOCALE`

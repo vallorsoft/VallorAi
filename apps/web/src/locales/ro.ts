@@ -125,6 +125,12 @@ export const ro = {
     placeholder: 'Descrie-ți casa visurilor...',
     error: 'Eroare la comunicarea cu AI-ul. Încearcă din nou.',
     quotaExceeded: 'Asistentul AI este momentan indisponibil (limită gratuită atinsă). Încearcă din nou mai târziu.',
+    roomAdded: 'Cameră adăugată la plan',
+    roomUpdated: 'Cameră actualizată în plan',
+    rebuildButton: 'Construiește planul din conversație',
+    rebuilding: 'Se construiește planul...',
+    rebuildDone: 'Plan actualizat, camere adăugate',
+    rebuildError: 'Construirea planului a eșuat. Încearcă din nou.',
   },
   auth: {
     register: {

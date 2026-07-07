@@ -122,6 +122,12 @@ export interface Dictionary {
     placeholder: string
     error: string
     quotaExceeded: string
+    roomAdded: string
+    roomUpdated: string
+    rebuildButton: string
+    rebuilding: string
+    rebuildDone: string
+    rebuildError: string
   }
   auth: {
     register: {

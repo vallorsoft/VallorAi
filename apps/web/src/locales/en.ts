@@ -1,0 +1,65 @@
+import type { Dictionary } from './types'
+
+export const en = {
+  common: {
+    appName: 'AI Home Designer',
+    loading: 'Loading...',
+  },
+  nav: {
+    projects: 'My projects',
+    marketplace: 'Marketplace',
+    settings: 'Account settings',
+  },
+  auth: {
+    register: {
+      title: 'Create your free account',
+      subtitle: 'Design your first home with AI',
+      nameLabel: 'Full name',
+      namePlaceholder: 'John Doe',
+      emailLabel: 'Email',
+      emailPlaceholder: 'you@example.com',
+      passwordLabel: 'Password',
+      passwordPlaceholder: 'At least 8 characters',
+      submit: 'Create account',
+      submitting: 'Creating account...',
+      hasAccount: 'Already have an account?',
+      loginLink: 'Sign in',
+      checkEmailTitle: 'Check your email',
+      checkEmailBody:
+        'We sent you a confirmation link. Open it to activate your account and sign in.',
+      genericError: 'Registration failed',
+    },
+    login: {
+      title: 'Welcome back',
+      subtitle: 'Sign in to continue your projects',
+      emailLabel: 'Email',
+      emailPlaceholder: 'you@example.com',
+      passwordLabel: 'Password',
+      passwordPlaceholder: '••••••••',
+      submit: 'Sign in',
+      submitting: 'Signing in...',
+      noAccount: "Don't have an account?",
+      registerLink: 'Sign up',
+      wrongCredentials: 'Incorrect email or password',
+      unverified: 'Email not verified',
+      resendVerification: 'Resend confirmation email',
+      resent: 'Email resent — check your inbox.',
+    },
+    verifyEmail: {
+      invalidLink: 'Invalid link — confirmation token is missing.',
+      verifyingTitle: 'Confirming your email...',
+      verifyingBody: 'One moment, please.',
+      successTitle: 'Account activated!',
+      successBody: 'Redirecting you to your projects...',
+      errorTitle: 'Confirmation failed',
+      genericError: 'Confirmation failed',
+      backToLogin: 'Back to sign in',
+    },
+  },
+  validation: {
+    nameMin: 'Name must be at least 2 characters',
+    emailInvalid: 'Invalid email',
+    passwordMin: 'Password must be at least 8 characters',
+    passwordRequired: 'Password is required',
+  },
+} satisfies Dictionary

@@ -1,0 +1,65 @@
+import type { Dictionary } from './types'
+
+export const hu = {
+  common: {
+    appName: 'AI Home Designer',
+    loading: 'Betöltés...',
+  },
+  nav: {
+    projects: 'Projektjeim',
+    marketplace: 'Piactér',
+    settings: 'Fiók beállításai',
+  },
+  auth: {
+    register: {
+      title: 'Ingyenes fiók létrehozása',
+      subtitle: 'Tervezd meg első otthonodat AI segítségével',
+      nameLabel: 'Teljes név',
+      namePlaceholder: 'Kovács János',
+      emailLabel: 'Email',
+      emailPlaceholder: 'te@pelda.hu',
+      passwordLabel: 'Jelszó',
+      passwordPlaceholder: 'Minimum 8 karakter',
+      submit: 'Fiók létrehozása',
+      submitting: 'Fiók létrehozása...',
+      hasAccount: 'Már van fiókod?',
+      loginLink: 'Jelentkezz be',
+      checkEmailTitle: 'Erősítsd meg az email címed',
+      checkEmailBody:
+        'Elküldtünk egy megerősítő linket. Nyisd meg a fiókod aktiválásához és a bejelentkezéshez.',
+      genericError: 'Sikertelen regisztráció',
+    },
+    login: {
+      title: 'Üdvözlünk újra',
+      subtitle: 'Jelentkezz be a projektjeid folytatásához',
+      emailLabel: 'Email',
+      emailPlaceholder: 'te@pelda.hu',
+      passwordLabel: 'Jelszó',
+      passwordPlaceholder: '••••••••',
+      submit: 'Bejelentkezés',
+      submitting: 'Bejelentkezés...',
+      noAccount: 'Nincs még fiókod?',
+      registerLink: 'Regisztrálj',
+      wrongCredentials: 'Hibás email vagy jelszó',
+      unverified: 'Email nincs megerősítve',
+      resendVerification: 'Megerősítő email újraküldése',
+      resent: 'Email újraküldve — nézd meg a postaládád.',
+    },
+    verifyEmail: {
+      invalidLink: 'Érvénytelen link — hiányzik a megerősítő token.',
+      verifyingTitle: 'Email megerősítése...',
+      verifyingBody: 'Egy pillanat, kérjük várj.',
+      successTitle: 'Fiók aktiválva!',
+      successBody: 'Átirányítunk a projektjeidhez...',
+      errorTitle: 'Sikertelen megerősítés',
+      genericError: 'A megerősítés sikertelen',
+      backToLogin: 'Vissza a bejelentkezéshez',
+    },
+  },
+  validation: {
+    nameMin: 'A névnek legalább 2 karakter hosszúnak kell lennie',
+    emailInvalid: 'Érvénytelen email cím',
+    passwordMin: 'A jelszónak legalább 8 karakter hosszúnak kell lennie',
+    passwordRequired: 'A jelszó megadása kötelező',
+  },
+} satisfies Dictionary

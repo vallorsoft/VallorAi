@@ -1,0 +1,65 @@
+import type { Dictionary } from './types'
+
+export const ro = {
+  common: {
+    appName: 'AI Home Designer',
+    loading: 'Se încarcă...',
+  },
+  nav: {
+    projects: 'Proiectele mele',
+    marketplace: 'Marketplace',
+    settings: 'Setări cont',
+  },
+  auth: {
+    register: {
+      title: 'Creează cont gratuit',
+      subtitle: 'Proiectează prima ta casă cu ajutorul AI',
+      nameLabel: 'Nume complet',
+      namePlaceholder: 'Ion Popescu',
+      emailLabel: 'Email',
+      emailPlaceholder: 'tu@exemplu.ro',
+      passwordLabel: 'Parolă',
+      passwordPlaceholder: 'Minim 8 caractere',
+      submit: 'Creează cont',
+      submitting: 'Se creează contul...',
+      hasAccount: 'Ai deja cont?',
+      loginLink: 'Autentifică-te',
+      checkEmailTitle: 'Verifică-ți emailul',
+      checkEmailBody:
+        'Ți-am trimis un link de confirmare. Deschide-l pentru a-ți activa contul și a te putea autentifica.',
+      genericError: 'Înregistrare eșuată',
+    },
+    login: {
+      title: 'Bun revenit',
+      subtitle: 'Autentifică-te pentru a-ți continua proiectele',
+      emailLabel: 'Email',
+      emailPlaceholder: 'tu@exemplu.ro',
+      passwordLabel: 'Parolă',
+      passwordPlaceholder: '••••••••',
+      submit: 'Autentificare',
+      submitting: 'Se autentifică...',
+      noAccount: 'Nu ai cont?',
+      registerLink: 'Înregistrează-te',
+      wrongCredentials: 'Email sau parolă incorectă',
+      unverified: 'Email neconfirmat',
+      resendVerification: 'Retrimite emailul de confirmare',
+      resent: 'Email retrimis — verifică-ți inboxul.',
+    },
+    verifyEmail: {
+      invalidLink: 'Link invalid — lipsește tokenul de confirmare.',
+      verifyingTitle: 'Se confirmă emailul...',
+      verifyingBody: 'Un moment, te rugăm.',
+      successTitle: 'Cont activat!',
+      successBody: 'Te redirecționăm către proiectele tale...',
+      errorTitle: 'Confirmare eșuată',
+      genericError: 'Confirmarea a eșuat',
+      backToLogin: 'Înapoi la autentificare',
+    },
+  },
+  validation: {
+    nameMin: 'Numele trebuie să aibă minim 2 caractere',
+    emailInvalid: 'Email invalid',
+    passwordMin: 'Parola trebuie să aibă minim 8 caractere',
+    passwordRequired: 'Parola este obligatorie',
+  },
+} satisfies Dictionary

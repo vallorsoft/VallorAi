@@ -89,6 +89,23 @@ export interface Dictionary {
     deleteRoom: string
     deletingRoom: string
     emptyCanvasHint: string
+    layerPanel: {
+      title: string
+      selectWallHint: string
+      loading: string
+      materialColumn: string
+      thicknessColumn: string
+      standardColumn: string
+      priceColumn: string
+      priceUnverifiedNotice: string
+      functionLabels: {
+        STRUCTURAL: string
+        INSULATION: string
+        RENDER: string
+        FINISH: string
+        PAINT: string
+      }
+    }
   }
   aiChat: {
     greeting1: string

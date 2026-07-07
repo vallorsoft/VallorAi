@@ -44,6 +44,32 @@ export function useHouse(projectId: string) {
   })
 }
 
+export interface WallAssemblyLayer {
+  id: string
+  order: number
+  thicknessMm: number
+  function: 'STRUCTURAL' | 'INSULATION' | 'RENDER' | 'FINISH' | 'PAINT'
+  material: {
+    id: string
+    name: string
+    standardRef: string | null
+    unit: string
+    unitCostRON: number
+    specSheet: { priceVerified?: boolean } & Record<string, unknown>
+  }
+}
+
+export function useWallLayers(wallId: string | null) {
+  return useQuery({
+    queryKey: ['wall-layers', wallId],
+    queryFn: async () => {
+      const res = await api.get(`/houses/walls/${wallId}/layers`)
+      return res.data as WallAssemblyLayer[]
+    },
+    enabled: !!wallId,
+  })
+}
+
 export function useConversation(projectId: string) {
   return useQuery({
     queryKey: ['conversation', projectId],

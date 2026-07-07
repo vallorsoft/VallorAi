@@ -91,6 +91,24 @@ export const hu = {
     deleteRoom: 'Szoba törlése',
     deletingRoom: 'Törlés...',
     emptyCanvasHint: 'Beszélj az AI-val a ház tervének elkészítéséhez',
+    layerPanel: {
+      title: 'Fal-szerkezet',
+      selectWallHint: 'Válassz ki egy falat a terven',
+      loading: 'Rétegek betöltése...',
+      materialColumn: 'Anyag',
+      thicknessColumn: 'Vastagság',
+      standardColumn: 'Szabvány',
+      priceColumn: 'Egységár',
+      priceUnverifiedNotice:
+        'Becsült, nem ellenőrzött ár — árajánlatként való felhasználás előtt egyeztess egy beszállítóval.',
+      functionLabels: {
+        STRUCTURAL: 'Teherhordó',
+        INSULATION: 'Hőszigetelés',
+        RENDER: 'Vakolat',
+        FINISH: 'Glett',
+        PAINT: 'Festés',
+      },
+    },
   },
   aiChat: {
     greeting1: 'Szia! Én vagyok az AI építész asszisztensed.',

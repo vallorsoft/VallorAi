@@ -91,6 +91,24 @@ export const ro = {
     deleteRoom: 'Șterge camera',
     deletingRoom: 'Se șterge...',
     emptyCanvasHint: 'Vorbește cu AI-ul pentru a genera planul casei',
+    layerPanel: {
+      title: 'Structura peretelui',
+      selectWallHint: 'Selectează un perete pe plan',
+      loading: 'Se încarcă straturile...',
+      materialColumn: 'Material',
+      thicknessColumn: 'Grosime',
+      standardColumn: 'Standard',
+      priceColumn: 'Preț unitar',
+      priceUnverifiedNotice:
+        'Preț estimativ, neverificat — confirmă cu un furnizor înainte de a-l folosi ca ofertă.',
+      functionLabels: {
+        STRUCTURAL: 'Structural',
+        INSULATION: 'Izolație',
+        RENDER: 'Tencuială',
+        FINISH: 'Glet',
+        PAINT: 'Vopsea',
+      },
+    },
   },
   aiChat: {
     greeting1: 'Bună! Sunt asistentul tău AI arhitect.',

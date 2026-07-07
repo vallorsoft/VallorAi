@@ -60,4 +60,9 @@ export class HousesController {
   ) {
     return this.housesService.updateWall(wallId, body, req.user.id)
   }
+
+  @Get('walls/:id/layers')
+  getWallLayers(@Param('id') wallId: string) {
+    return this.housesService.getWallLayers(wallId)
+  }
 }

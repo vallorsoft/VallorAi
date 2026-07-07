@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { FloorPlanCanvas } from './FloorPlanCanvas'
 import { EditorToolbar } from './EditorToolbar'
 import { RoomPanel } from './RoomPanel'
+import { WallLayerPanel } from './WallLayerPanel'
 import { AiChat } from '@/components/ai/AiChat'
 import { useHouse } from '@/hooks/useProjects'
 import { useProjectStore } from '@/store/project.store'
@@ -12,7 +13,7 @@ import { useTranslation } from '@/lib/useTranslation'
 export function EditorLayout({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
   const { data: house } = useHouse(projectId)
-  const { setHouse, setActiveProject } = useProjectStore()
+  const { setHouse, setActiveProject, selectedWallId } = useProjectStore()
 
   useEffect(() => {
     setActiveProject(projectId)
@@ -37,12 +38,14 @@ export function EditorLayout({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {/* Right: Properties panel */}
+      {/* Right: Properties / wall-assembly panel */}
       <div className="w-64 bg-white border-l border-gray-200 overflow-y-auto">
         <div className="border-b border-gray-100 px-4 py-3">
-          <h3 className="font-medium text-sm text-gray-700">{t.editor.propertiesTitle}</h3>
+          <h3 className="font-medium text-sm text-gray-700">
+            {selectedWallId ? t.editor.layerPanel.title : t.editor.propertiesTitle}
+          </h3>
         </div>
-        <RoomPanel projectId={projectId} />
+        {selectedWallId ? <WallLayerPanel /> : <RoomPanel projectId={projectId} />}
       </div>
     </div>
   )

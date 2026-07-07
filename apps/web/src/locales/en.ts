@@ -91,6 +91,24 @@ export const en = {
     deleteRoom: 'Delete room',
     deletingRoom: 'Deleting...',
     emptyCanvasHint: 'Talk to the AI to generate the house plan',
+    layerPanel: {
+      title: 'Wall assembly',
+      selectWallHint: 'Select a wall on the plan',
+      loading: 'Loading layers...',
+      materialColumn: 'Material',
+      thicknessColumn: 'Thickness',
+      standardColumn: 'Standard',
+      priceColumn: 'Unit price',
+      priceUnverifiedNotice:
+        'Estimated, unverified price — confirm with a supplier before using it as a quote.',
+      functionLabels: {
+        STRUCTURAL: 'Structural',
+        INSULATION: 'Insulation',
+        RENDER: 'Render',
+        FINISH: 'Skim coat',
+        PAINT: 'Paint',
+      },
+    },
   },
   aiChat: {
     greeting1: "Hi! I'm your AI architect assistant.",

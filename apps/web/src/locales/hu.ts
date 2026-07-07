@@ -113,6 +113,8 @@ export const hu = {
     },
     viewer3d: {
       lodLabel: 'Részletességi szint',
+      masonryComputing: 'Falazat generálása…',
+      brickCountLabel: 'Téglák',
     },
   },
   aiChat: {

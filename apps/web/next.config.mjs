@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  transpilePackages: ['@ai-home-designer/types'],
+  transpilePackages: ['@ai-home-designer/types', '@ai-home-designer/bim-engine'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.r2.dev' },

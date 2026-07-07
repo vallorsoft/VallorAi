@@ -113,6 +113,8 @@ export const ro = {
     },
     viewer3d: {
       lodLabel: 'Nivel de detaliu',
+      masonryComputing: 'Se generează zidăria…',
+      brickCountLabel: 'Cărămizi',
     },
   },
   aiChat: {

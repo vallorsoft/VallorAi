@@ -1,3 +1,5 @@
 export * from './types'
 export * from './masonry'
 export * from './rebar'
+export * from './instancing'
+export * from './spec-sheet'

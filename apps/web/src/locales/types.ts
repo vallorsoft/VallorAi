@@ -110,6 +110,8 @@ export interface Dictionary {
     }
     viewer3d: {
       lodLabel: string
+      masonryComputing: string
+      brickCountLabel: string
     }
   }
   aiChat: {

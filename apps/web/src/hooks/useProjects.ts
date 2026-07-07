@@ -51,6 +51,7 @@ export interface WallAssemblyLayer {
   function: 'STRUCTURAL' | 'INSULATION' | 'RENDER' | 'FINISH' | 'PAINT'
   material: {
     id: string
+    category: string
     name: string
     standardRef: string | null
     unit: string
@@ -59,13 +60,15 @@ export interface WallAssemblyLayer {
   }
 }
 
+export async function fetchWallLayers(wallId: string): Promise<WallAssemblyLayer[]> {
+  const res = await api.get(`/houses/walls/${wallId}/layers`)
+  return res.data as WallAssemblyLayer[]
+}
+
 export function useWallLayers(wallId: string | null) {
   return useQuery({
     queryKey: ['wall-layers', wallId],
-    queryFn: async () => {
-      const res = await api.get(`/houses/walls/${wallId}/layers`)
-      return res.data as WallAssemblyLayer[]
-    },
+    queryFn: () => fetchWallLayers(wallId as string),
     enabled: !!wallId,
   })
 }

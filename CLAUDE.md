@@ -230,15 +230,46 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     dependency, or `next/dynamic(..., { ssr: false })` for `FloorPlanCanvas`) but out of scope
     for the BIM-detail viewer.
 
-### Next (Steps 6–9, not started)
+- **Step 6 — brick coursing + instancing (opening-free walls)**: the LOD `detail` tier now
+  renders real per-brick geometry for every wall whose STRUCTURAL layer has unit-masonry
+  dimensions in its material specSheet.
+  - `packages/bim-engine` grew two new pure modules (unit-tested like the rest):
+    `spec-sheet.ts` (`brickModuleFromSpecSheet` — maps `Material.specSheet` JSON to a
+    `BrickModule`; NE 001/1996 / C 126-75 default joints of 12/10mm, head joint 0 when
+    `specSheet.tongueAndGroove` is true, per the Leier N+F laying instructions) and
+    `instancing.ts` (`generateWallBrickInstances`/`composeBrickInstanceMatrices` — running-bond
+    layout composed into column-major 4×4 instance matrices in meters, directly usable as an
+    `InstancedMesh.instanceMatrix` buffer over a unit box; wall-placement convention matches
+    `WallMesh`'s `rotationY = -atan2(dz, dx)`). The seeded masonry specSheets now carry
+    explicit `bedJointMm`/`headJointMm` with citations.
+  - `apps/web` (now depends on `@ai-home-designer/bim-engine`, added to `transpilePackages`):
+    `useBrickInstances.ts` fetches every wall's layers via `useQueries` (shared
+    `['wall-layers', id]` cache with `WallLayerPanel`), runs transform generation in a plain
+    Web Worker (`brick-layout.worker.ts`, `new Worker(new URL(...))` — no comlink needed;
+    buffers returned as transferables, zero main-thread jank), caches per
+    `wallId + layer-spec hash`, and pools instances per **material × floor** — draw calls stay
+    bounded regardless of wall count. `BrickInstances.tsx` renders one `InstancedMesh` per pool
+    (`castShadow`/`receiveShadow` explicitly false; cut bricks tinted darker via
+    `instanceColor`; `meshLambertMaterial` because per-pixel PBR cost dominates when bricks
+    fill the screen). `WallMesh` gained a `mortarCoreWidthM` variant: in detail mode the wall
+    box shrinks to a mortar-colored core inset inside the brick envelope, so the 12mm bed
+    joints read as mortar instead of gaps.
+  - `useLOD` fix: it measured camera distance to the house group's `position` — which is the
+    recentering *offset*, not the visual center — so `detail` was unreachable on off-center
+    houses. It now measures distance to the house's world center (the origin after
+    recentering).
+  - Browser-verified end-to-end (local Postgres + API + seeded 10×8m house, 4 Leier-38
+    exterior walls + 1 solid-brick partition): zooming under 8m swaps boxes → 2,774 bricks
+    (shown in the debug overlay via the new `viewer3d.brickCountLabel`/`masonryComputing`
+    i18n keys, all 3 locales), correct running bond with cut half-bricks, N+F walls show no
+    vertical joints, orbiting stays interactive, zooming out swaps back. Frame rate in the
+    headless container (SwiftShader software GL, no GPU) dropped 36→10 FPS at detail tier —
+    not representative of real hardware (~3k instances in 3 draw calls is trivial for any
+    GPU), so the 8m/25m LOD thresholds stand, but **re-check FPS on a real GPU before scaling
+    to multi-floor houses** and tighten `LOD_NEAR_M` if needed.
 
-6. **Brick coursing + instancing, opening-free walls first** — pool one `InstancedMesh` per
-   (material × floor), not per wall, to bound draw calls; validate real-world frame rate on a
-   single wall in isolation before generalizing to a whole house. Disable real-time shadows on
-   brick/rebar instances specifically (that's the actual GPU cost, not instance count — a
-   coarse wall box can cast the shadow instead). Run instance-transform generation in a Web
-   Worker (e.g. Comlink), not the main thread, or the UI will visibly jank when detail mode
-   turns on; cache by `wallId + layer-spec hash`.
+### Next (Steps 7–9, not started)
+
 7. **Opening-aware cut-brick generation** — the largest unresolved engineering risk. Real,
    individually-modeled (not instanced) cut bricks at the jambs/lintel of each `Opening`,
    centimeter-precise per `Opening.position/width/height/sillHeight`, with coursing anchored

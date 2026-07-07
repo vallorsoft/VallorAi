@@ -113,6 +113,8 @@ export const en = {
     },
     viewer3d: {
       lodLabel: 'Level of detail',
+      masonryComputing: 'Generating masonry…',
+      brickCountLabel: 'Bricks',
     },
   },
   aiChat: {

@@ -50,6 +50,8 @@ async function main() {
         fireResistance: 'REI120',
         dryDensityKgM3: 690,
         tongueAndGroove: true, // no vertical mortar joint
+        bedJointMm: 12, // general-purpose mortar bed per NE 001/1996 / P2-85
+        headJointMm: 0, // N+F tongue-and-groove — dry vertical joint per Leier laying instructions
         mortarConsumptionLPerM2: 26,
         priceVerified: false,
         priceSource: 'Manufacturer literature estimate — confirm with official Leier datasheet/quote',
@@ -65,6 +67,8 @@ async function main() {
         lengthMm: 240,
         widthMm: 115,
         heightMm: 63,
+        bedJointMm: 12, // NE 001/1996 / C 126-75
+        headJointMm: 10, // NE 001/1996 / C 126-75
         priceVerified: false,
         priceSource: 'Estimate pending Bursa Construcțiilor verification',
       },

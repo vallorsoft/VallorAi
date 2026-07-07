@@ -126,6 +126,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ai-home-designer/bim-engine':
+        specifier: workspace:*
+        version: link:../../packages/bim-engine
       '@ai-home-designer/types':
         specifier: workspace:*
         version: link:../../packages/types

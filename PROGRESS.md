@@ -90,10 +90,50 @@
 |------|--------|
 | `fly.toml` for API + web deployment | ✅ |
 | `Dockerfile.api` + `Dockerfile.web` | ✅ |
-| GitHub Actions CI/CD pipeline (db-push → deploy-api → deploy-web) | ✅ |
+| GitHub Actions CI/CD pipeline (db-migrate → deploy-api → deploy-web) | ✅ |
 | Neon DB connection + `prisma db push` (13 tables live) | ✅ |
 | Workspace packages compiled to JS for runtime (fixed API crash-loop) | ✅ |
 | Cloudflare R2 storage integration | ⬜ |
+
+---
+
+## Spec audit & roadmap (2026-07-07)
+
+13 PDF specs uploaded to `docs/materials/` were processed and cross-checked against
+the codebase (see `Master p.PDF`/`Master 2.PDF` note below). A phased roadmap was
+produced reconciling the specs' vision with what's actually built; full detail lives
+in the session's plan, condensed here as Phase 0/1 below. Two files
+(`Master p.PDF`, `Master 2.PDF`) contain AI-agent prompt-injection style text, not
+genuine specs — their literal instructions are not followed; their product content
+(manufacturer schema etc.) is noted only as background for a future marketplace phase.
+
+### Phase 0 — Baseline hygiene — DONE
+
+| Task | Status |
+|------|--------|
+| Real Prisma migrations (`packages/database/prisma/migrations/`, baselined as `20260707052955_init`) | ✅ |
+| Jest unit test harness for `apps/api` (`RulesService` coverage) | ✅ |
+| Jest e2e smoke test harness for `apps/api` (auth guard + register flow) | ✅ |
+| CI: `db-push` job replaced with `db-migrate` (`prisma migrate deploy`) | ✅ (code) — **manual one-time step still required**, see below |
+
+**Action required before the next deploy runs**: production's Neon DB already has this
+schema applied via the old `db push` step, so Prisma has no migration history for it.
+Before `db-migrate` runs for real, someone with the production `DATABASE_URL` must run
+once:
+```
+pnpm --filter @ai-home-designer/database exec prisma migrate resolve --applied 20260707052955_init
+```
+Skipping this makes the first `migrate deploy` fail (it will try to re-create tables
+that already exist). This was deliberately not run by the agent — it touches the live
+production database and needs a human with real prod credentials.
+
+### Phase 1 — Foundation correctness — NOT STARTED (needs product-owner sign-off on scope)
+
+Response envelope, auth hardening (forgot/reset-password), `ProjectRole`/`ProjectPermission`
+for per-project sharing, `ProjectVersion` snapshotting, AI system-prompt language fix
+(`getSystemPrompt` currently ignores the `language` param and always returns Romanian),
+AI JSON response validation. See session plan for full detail and the items needing
+explicit business sign-off before starting.
 
 ---
 

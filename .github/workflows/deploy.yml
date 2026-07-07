@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  db-push:
-    name: Push Prisma Schema
+  db-migrate:
+    name: Apply Prisma Migrations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,15 +24,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Push schema to database
-        run: pnpm --filter @ai-home-designer/database exec prisma db push
+      # NOTE: this replaces the old `prisma db push` step. `db push` has no
+      # history and silently drifts from the schema in git; `migrate deploy`
+      # only applies committed migrations (packages/database/prisma/migrations/).
+      #
+      # ONE-TIME MANUAL STEP REQUIRED before this runs against the real DB:
+      # the production database already has this schema applied via the old
+      # `db push` step, so Prisma has no migration history for it yet. Run
+      # once, by hand, against production:
+      #   pnpm --filter @ai-home-designer/database exec prisma migrate resolve \
+      #     --applied 20260707052955_init
+      # Skipping this will make the first `migrate deploy` fail (it will try
+      # to re-create tables that already exist).
+      - name: Apply migrations to database
+        run: pnpm --filter @ai-home-designer/database exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   deploy-api:
     name: Deploy API (vallorai-api)
     runs-on: ubuntu-latest
-    needs: db-push
+    needs: db-migrate
     steps:
       - uses: actions/checkout@v4
 

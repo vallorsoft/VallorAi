@@ -1,0 +1,41 @@
+name: Run DB Migrations Only
+
+# Manually-triggered only. Applies committed Prisma migrations
+# (packages/database/prisma/migrations/) to whatever database the
+# DATABASE_URL secret points at, via `prisma migrate deploy` — without
+# cascading into the Fly.io deploy jobs that deploy.yml's db-migrate job
+# triggers. Use this when you need to bring a database's schema in sync
+# (e.g. a new/replacement Neon instance) without redeploying the apps.
+#
+# Before running against a database that already has some schema applied
+# outside of Prisma's migration history (e.g. via an old `db push` step),
+# use the "Baseline Prisma Migrations" workflow first to resolve the
+# already-applied migrations, exactly as documented in deploy.yml's
+# db-migrate job comments.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Apply Prisma migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.1.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Apply migrations to database
+        run: pnpm --filter @ai-home-designer/database exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

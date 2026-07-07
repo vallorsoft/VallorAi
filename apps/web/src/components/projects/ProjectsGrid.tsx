@@ -3,8 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useProjects, useCreateProject } from '@/hooks/useProjects'
+import { useTranslation } from '@/lib/useTranslation'
+import { DATE_LOCALES, type Dictionary } from '@/locales'
 
 export function ProjectsGrid() {
+  const { t, locale } = useTranslation()
   const { data: projects, isLoading } = useProjects()
   const createProject = useCreateProject()
   const [showModal, setShowModal] = useState(false)
@@ -38,7 +41,7 @@ export function ProjectsGrid() {
           <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-brand-100 flex items-center justify-center text-xl transition-colors">
             +
           </div>
-          <span className="text-sm font-medium text-gray-500 group-hover:text-brand-600">Proiect nou</span>
+          <span className="text-sm font-medium text-gray-500 group-hover:text-brand-600">{t.projectsGrid.newProject}</span>
         </button>
 
         {projects?.map((p) => (
@@ -47,12 +50,12 @@ export function ProjectsGrid() {
               <div className="flex items-start justify-between mb-3">
                 <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-xl">🏠</div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(p.status)}`}>
-                  {statusLabel(p.status)}
+                  {statusLabel(p.status, t)}
                 </span>
               </div>
               <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">{p.name}</h3>
               <p className="text-xs text-gray-400 mt-auto">
-                {new Date(p.updatedAt).toLocaleDateString('ro-RO')}
+                {new Date(p.updatedAt).toLocaleDateString(DATE_LOCALES[locale])}
               </p>
             </div>
           </Link>
@@ -62,11 +65,11 @@ export function ProjectsGrid() {
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
-            <h2 className="font-bold text-gray-900 mb-4">Proiect nou</h2>
+            <h2 className="font-bold text-gray-900 mb-4">{t.projectsGrid.modalTitle}</h2>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Numele proiectului"
+              placeholder={t.projectsGrid.namePlaceholder}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4"
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               autoFocus
@@ -76,14 +79,14 @@ export function ProjectsGrid() {
                 onClick={() => setShowModal(false)}
                 className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
               >
-                Anulează
+                {t.projectsGrid.cancel}
               </button>
               <button
                 onClick={handleCreate}
                 disabled={!name.trim() || createProject.isPending}
                 className="flex-1 px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 disabled:opacity-50"
               >
-                {createProject.isPending ? 'Se creează...' : 'Creează'}
+                {createProject.isPending ? t.projectsGrid.creating : t.projectsGrid.create}
               </button>
             </div>
           </div>
@@ -93,8 +96,8 @@ export function ProjectsGrid() {
   )
 }
 
-function statusLabel(s: string) {
-  return ({ DRAFT: 'Ciornă', INTERVIEW: 'Interviu', DESIGNING: 'Design', REVIEW: 'Revizuire', COMPLETE: 'Complet' }[s] ?? s)
+function statusLabel(s: string, t: Dictionary) {
+  return (t.projectsGrid.status as Record<string, string>)[s] ?? s
 }
 
 function statusColor(s: string) {

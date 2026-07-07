@@ -1,6 +1,6 @@
 # AI Home Designer — Build Progress
 
-> Last updated: 2026-07-06 (post-launch)
+> Last updated: 2026-07-07 (BIM-detail feature, steps 0-4 done)
 
 ## Live status
 - **API**: https://vallorai-api.fly.dev/api/v1 — deployed, stable
@@ -179,11 +179,38 @@ versioning migration to match what's actually on production) when the two branch
 
 ---
 
+## Phase 7 — BIM-level detail (brick/rebar-level 2D/3D) — IN PROGRESS
+
+Prioritized by the product owner ahead of the remaining Phase 2 items (DXF export, geometry
+validation), which are paused until this lands. Full technical detail and rationale now lives
+in `CLAUDE.md`'s "BIM-detail feature" section (the original planning doc lived outside the git
+repo and did not persist between sessions — `CLAUDE.md` is the durable reference from here on).
+
+| Step | Task | Status |
+|------|------|--------|
+| 0 | Research real RO/HU standards for brick/rebar/plaster/insulation defaults (no invented values) | ✅ |
+| 1 | Data model: `Material`/`AssemblyLayer`/`ReinforcementSpec`/`Foundation` + migration + seed (9 `GENERIC_DEFAULT` materials incl. Leiertherm 38 N+F) | ✅ |
+| 2 | `packages/bim-engine` — masonry running-bond + longitudinal rebar quantity/layout calc, own build step, wired into both Dockerfiles | ✅ |
+| 3 | 2D wall layer-inspector panel (`WallLayerPanel.tsx`), click-to-select wall, i18n'd, browser-verified RO/HU/EN | ✅ |
+| 4 | Cost engine BOQ integration — real per-material lines replace flat masonry/plastering/painting/insulation rates once wall data exists | ✅ |
+| 5 | React Three Fiber viewer foundation (extruded-box walls, LOD scaffold, no brick detail yet) | ⬜ |
+| 6 | Brick coursing + instancing for opening-free walls, perf-validated on one wall first | ⬜ |
+| 7 | Opening-aware cut-brick generation (centimeter-precise, anchored from openings) — biggest remaining engineering risk | ⬜ |
+| 8 | Longitudinal rebar instancing | ⬜ |
+| 9 | Stirrup/bent rebar geometry (distinct from longitudinal, separate calc + instance pool) | ⬜ |
+
+Also still open: the new migration `20260707071500_add_material_assembly_reinforcement` has
+not yet been applied to production Neon (needs the same manual baseline/deploy treatment as
+the Phase 0 migrations, via the existing `db-baseline-migrations.yml` workflow, once this
+branch merges to `main`).
+
+---
+
 ## Phase 6 — Features (Next iterations)
 
 | Feature | Status |
 |---------|--------|
-| 3D viewer (Three.js) | ⬜ |
+| 3D viewer (Three.js) | 🔄 see Phase 7 — Steps 5-9 |
 | Energy optimizer module | ⬜ |
 | Architect Workspace (professional tools) | ⬜ |
 | Permit document generator (DTAC/PTh) | ⬜ |

@@ -9,6 +9,7 @@ COPY package.json pnpm-workspace.yaml ./
 COPY packages/types/package.json ./packages/types/
 COPY packages/database/package.json ./packages/database/
 COPY packages/ai-gateway/package.json ./packages/ai-gateway/
+COPY packages/bim-engine/package.json ./packages/bim-engine/
 COPY apps/web/package.json ./apps/web/
 RUN pnpm install --no-frozen-lockfile
 
@@ -22,6 +23,7 @@ COPY --from=installer /app ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 COPY tsconfig.base.json ./
+RUN pnpm --filter @ai-home-designer/bim-engine build
 RUN pnpm --filter @ai-home-designer/web build
 
 FROM node:20-alpine AS runner

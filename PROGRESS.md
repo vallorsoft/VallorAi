@@ -199,10 +199,15 @@ repo and did not persist between sessions — `CLAUDE.md` is the durable referen
 | 8 | Longitudinal rebar instancing | ⬜ |
 | 9 | Stirrup/bent rebar geometry (distinct from longitudinal, separate calc + instance pool) | ⬜ |
 
-Also still open: the new migration `20260707071500_add_material_assembly_reinforcement` has
-not yet been applied to production Neon (needs the same manual baseline/deploy treatment as
-the Phase 0 migrations, via the existing `db-baseline-migrations.yml` workflow, once this
-branch merges to `main`).
+Steps 0-4 (plus the i18n dictionary work) merged to `main` via PR #25 on 2026-07-07.
+
+**Action required, not yet done**: the migration `20260707071500_add_material_assembly_reinforcement`
+is now on `main` but has **not** been applied to production Neon — it needs the same manual
+`prisma migrate resolve`/baseline treatment as the Phase 0 migrations (see the
+`db-baseline-migrations.yml` workflow), or it will simply run for real on the next
+`migrate deploy` if production's schema doesn't already have these tables (unlike the Phase 0
+case, this migration is genuinely new — there's nothing to baseline-skip here, just confirm
+the next deploy's `migrate deploy` step actually runs it and succeeds).
 
 ---
 

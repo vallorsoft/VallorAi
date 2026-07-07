@@ -61,7 +61,10 @@ jobs:
             -d "{\"email\":\"$DIAG_EMAIL\",\"name\":\"CI Diagnostics\",\"password\":\"$DIAG_PASSWORD\"}" || true
 
       - name: Mark diagnostics user as verified
-        run: psql "$DATABASE_URL" -c "UPDATE \"User\" SET \"isVerified\" = true WHERE email = '${DIAG_EMAIL}';"
+        run: |
+          # psql doesn't understand Prisma-only query params like pgbouncer=true.
+          PSQL_URL=$(echo "$DATABASE_URL" | sed -E 's/[?&]pgbouncer=[^&]*//')
+          psql "$PSQL_URL" -c "UPDATE \"User\" SET \"isVerified\" = true WHERE email = '${DIAG_EMAIL}';"
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

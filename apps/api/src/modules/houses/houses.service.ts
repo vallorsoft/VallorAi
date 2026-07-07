@@ -82,4 +82,62 @@ export class HousesService {
     const total = rooms.reduce((sum, r) => sum + r.area, 0)
     return prisma.house.update({ where: { id: houseId }, data: { totalArea: total } })
   }
+
+  /**
+   * Returns a wall's layer stack (with material details), auto-provisioning
+   * a sensible generic-default assembly on first access if none exists yet —
+   * this is what makes the spec-inspector panel show real values immediately,
+   * without requiring a separate manual setup step. Order is outside -> inside.
+   */
+  async getWallLayers(wallId: string) {
+    const existing = await prisma.assemblyLayer.findMany({
+      where: { wallId },
+      include: { material: true },
+      orderBy: { order: 'asc' },
+    })
+    if (existing.length > 0) return existing
+
+    const wall = await prisma.wall.findUniqueOrThrow({ where: { id: wallId } })
+    await this.provisionDefaultWallAssembly(wall.id, wall.isExterior)
+
+    return prisma.assemblyLayer.findMany({
+      where: { wallId },
+      include: { material: true },
+      orderBy: { order: 'asc' },
+    })
+  }
+
+  private async provisionDefaultWallAssembly(wallId: string, isExterior: boolean) {
+    const byName = async (name: string) =>
+      prisma.material.findFirstOrThrow({ where: { name, source: 'GENERIC_DEFAULT' } })
+
+    if (isExterior) {
+      const [render, block, plaster, paint] = await Promise.all([
+        byName('Tencuială exterioară (grund)'),
+        byName('Leiertherm 38 N+F'),
+        byName('Glet de var/ipsos'),
+        byName('Vopsea lavabilă interior'),
+      ])
+      await prisma.assemblyLayer.createMany({
+        data: [
+          { wallId, order: 1, materialId: render.id, thicknessMm: 18, function: 'RENDER' },
+          { wallId, order: 2, materialId: block.id, thicknessMm: 380, function: 'STRUCTURAL' },
+          { wallId, order: 3, materialId: plaster.id, thicknessMm: 2, function: 'FINISH' },
+          { wallId, order: 4, materialId: paint.id, thicknessMm: 0.3, function: 'PAINT' },
+        ],
+      })
+    } else {
+      const [plaster, brick] = await Promise.all([
+        byName('Glet de var/ipsos'),
+        byName('Cărămidă plină arsă'),
+      ])
+      await prisma.assemblyLayer.createMany({
+        data: [
+          { wallId, order: 1, materialId: plaster.id, thicknessMm: 2, function: 'FINISH' },
+          { wallId, order: 2, materialId: brick.id, thicknessMm: 240, function: 'STRUCTURAL' },
+          { wallId, order: 3, materialId: plaster.id, thicknessMm: 2, function: 'FINISH' },
+        ],
+      })
+    }
+  }
 }

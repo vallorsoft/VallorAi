@@ -4,17 +4,19 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { useRouter } from 'next/navigation'
-
-const navItems = [
-  { href: '/projects', label: 'Proiecte', icon: '🏠' },
-  { href: '/marketplace', label: 'Marketplace', icon: '🛒' },
-  { href: '/settings', label: 'Setări', icon: '⚙️' },
-]
+import { useTranslation } from '@/lib/useTranslation'
 
 export function Sidebar() {
   const pathname = usePathname()
   const logout = useAuthStore((s) => s.logout)
   const router = useRouter()
+  const { t } = useTranslation()
+
+  const navItems = [
+    { href: '/projects', label: t.sidebar.projects, icon: '🏠' },
+    { href: '/marketplace', label: t.sidebar.marketplace, icon: '🛒' },
+    { href: '/settings', label: t.sidebar.settings, icon: '⚙️' },
+  ]
 
   const handleLogout = () => {
     logout()
@@ -28,7 +30,7 @@ export function Sidebar() {
           <div className="w-7 h-7 bg-brand-500 rounded-md flex items-center justify-center">
             <span className="text-white font-bold text-xs">AI</span>
           </div>
-          <span className="font-semibold text-gray-900 text-sm">AI Home Designer</span>
+          <span className="font-semibold text-gray-900 text-sm">{t.common.appName}</span>
         </div>
       </div>
 
@@ -58,7 +60,7 @@ export function Sidebar() {
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
         >
           <span>🚪</span>
-          Deconectare
+          {t.sidebar.logout}
         </button>
       </div>
     </aside>

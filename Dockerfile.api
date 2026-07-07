@@ -9,6 +9,7 @@ COPY package.json pnpm-workspace.yaml ./
 COPY packages/types/package.json ./packages/types/
 COPY packages/database/package.json ./packages/database/
 COPY packages/ai-gateway/package.json ./packages/ai-gateway/
+COPY packages/bim-engine/package.json ./packages/bim-engine/
 COPY apps/api/package.json ./apps/api/
 RUN pnpm install --no-frozen-lockfile
 
@@ -21,6 +22,7 @@ COPY tsconfig.base.json ./
 RUN pnpm --filter @ai-home-designer/database exec prisma generate
 RUN pnpm --filter @ai-home-designer/database build \
  && pnpm --filter @ai-home-designer/ai-gateway build \
+ && pnpm --filter @ai-home-designer/bim-engine build \
  && pnpm --filter @ai-home-designer/api build
 
 FROM node:20-alpine AS runner

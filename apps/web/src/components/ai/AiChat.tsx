@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { useTranslation } from '@/lib/useTranslation'
 
 interface Message {
   id: string
@@ -16,6 +17,7 @@ interface AiChatProps {
 }
 
 export function AiChat({ projectId }: AiChatProps) {
+  const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -46,7 +48,7 @@ export function AiChat({ projectId }: AiChatProps) {
       await api.post(`/ai/projects/${projectId}/chat`, { message: text })
       await qc.invalidateQueries({ queryKey: ['conversation', projectId] })
     } catch {
-      setStreamingContent('Eroare la comunicarea cu AI-ul. Încearcă din nou.')
+      setStreamingContent(t.aiChat.error)
     } finally {
       setSending(false)
     }
@@ -59,8 +61,8 @@ export function AiChat({ projectId }: AiChatProps) {
         {messages.length === 0 && !sending && (
           <div className="text-center text-gray-400 text-sm py-8">
             <div className="text-3xl mb-2">👋</div>
-            <p>Bună! Sunt asistentul tău AI arhitect.</p>
-            <p className="mt-1">Spune-mi despre casa pe care vrei să o proiectezi.</p>
+            <p>{t.aiChat.greeting1}</p>
+            <p className="mt-1">{t.aiChat.greeting2}</p>
           </div>
         )}
 
@@ -116,7 +118,7 @@ export function AiChat({ projectId }: AiChatProps) {
                 sendMessage()
               }
             }}
-            placeholder="Descrie-ți casa visurilor..."
+            placeholder={t.aiChat.placeholder}
             rows={1}
             className="flex-1 resize-none px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-h-32"
           />

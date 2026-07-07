@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { Stage, Layer, Rect, Line, Text, Group } from 'react-konva'
 import { useProjectStore } from '@/store/project.store'
+import { useTranslation } from '@/lib/useTranslation'
 
 const SCALE = 40 // pixels per meter
 const GRID = 1   // grid every 1m
@@ -19,7 +20,8 @@ const ROOM_COLORS: Record<string, string> = {
 }
 
 export function FloorPlanCanvas() {
-  const { house, selectRoom, selectedRoomId } = useProjectStore()
+  const { house, selectRoom, selectedRoomId, selectWall, selectedWallId } = useProjectStore()
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const width = containerRef.current?.clientWidth ?? 800
   const height = containerRef.current?.clientHeight ?? 600
@@ -85,26 +87,32 @@ export function FloorPlanCanvas() {
 
         {/* Walls layer */}
         <Layer>
-          {house?.walls.map((wall) => (
-            <Line
-              key={wall.id}
-              points={[
-                wall.startX * SCALE + 40,
-                wall.startY * SCALE + 40,
-                wall.endX * SCALE + 40,
-                wall.endY * SCALE + 40,
-              ]}
-              stroke="#1e293b"
-              strokeWidth={wall.thickness ? wall.thickness * SCALE : 4}
-              lineCap="round"
-            />
-          ))}
+          {house?.walls.map((wall) => {
+            const selected = selectedWallId === wall.id
+            return (
+              <Line
+                key={wall.id}
+                points={[
+                  wall.startX * SCALE + 40,
+                  wall.startY * SCALE + 40,
+                  wall.endX * SCALE + 40,
+                  wall.endY * SCALE + 40,
+                ]}
+                stroke={selected ? '#0ea5e9' : '#1e293b'}
+                strokeWidth={wall.thickness ? wall.thickness * SCALE : 4}
+                hitStrokeWidth={Math.max(20, wall.thickness ? wall.thickness * SCALE : 4)}
+                lineCap="round"
+                onClick={() => selectWall(wall.id)}
+                onTap={() => selectWall(wall.id)}
+              />
+            )
+          })}
         </Layer>
       </Stage>
 
       {!house && (
         <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">
-          Vorbește cu AI-ul pentru a genera planul casei
+          {t.editor.emptyCanvasHint}
         </div>
       )}
     </div>

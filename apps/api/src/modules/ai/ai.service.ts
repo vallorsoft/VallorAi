@@ -37,7 +37,9 @@ export class AiService {
         },
         OPENAI: {
           apiKey: config.get('OPENAI_API_KEY') ?? '',
-          model: config.get('OPENAI_MODEL') ?? 'gpt-4o',
+          // gpt-4o still works via the API but is no longer OpenAI's
+          // recommended default — gpt-5.5 is, as of mid-2026.
+          model: config.get('OPENAI_MODEL') ?? 'gpt-5.5',
         },
       },
     })

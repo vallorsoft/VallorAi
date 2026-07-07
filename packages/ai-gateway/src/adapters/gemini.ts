@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { AIAdapter, AICompletionOptions, AICompletionResult } from '../interface'
-import { AIQuotaExceededError, isQuotaExceededMessage } from '../errors'
+import { AIQuotaExceededError, isQuotaExceededMessage, isTransientOverloadMessage, retryOnOverload } from '../errors'
 
 export class GeminiAdapter implements AIAdapter {
   readonly provider = 'GEMINI'
@@ -14,7 +14,7 @@ export class GeminiAdapter implements AIAdapter {
 
   private rethrowIfQuotaExceeded(err: unknown): never {
     const message = err instanceof Error ? err.message : String(err)
-    if (isQuotaExceededMessage(message)) {
+    if (isQuotaExceededMessage(message) || isTransientOverloadMessage(message)) {
       throw new AIQuotaExceededError(this.provider, message)
     }
     throw err
@@ -51,7 +51,9 @@ export class GeminiAdapter implements AIAdapter {
     })
 
     try {
-      const result = await chat.sendMessage(lastMessage)
+      // Google's own "high demand" 503 explicitly says it's usually momentary
+      // — worth a couple of short retries before treating it as unavailable.
+      const result = await retryOnOverload(() => chat.sendMessage(lastMessage))
       const response = result.response
       const usage = response.usageMetadata
 
@@ -82,7 +84,7 @@ export class GeminiAdapter implements AIAdapter {
     })
 
     try {
-      const result = await chat.sendMessageStream(lastMessage)
+      const result = await retryOnOverload(() => chat.sendMessageStream(lastMessage))
       for await (const chunk of result.stream) {
         const text = chunk.text()
         if (text) yield text

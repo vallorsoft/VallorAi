@@ -6,7 +6,10 @@ export class OpenAIAdapter implements AIAdapter {
   readonly model: string
   private client: OpenAI
 
-  constructor(apiKey: string, model = 'gpt-4o') {
+  // gpt-4o still works via the API (unlike Gemini 1.5, it hasn't been
+  // retired), but OpenAI has been steering new usage toward newer models —
+  // gpt-5.5 is their current recommended flagship as of mid-2026.
+  constructor(apiKey: string, model = 'gpt-5.5') {
     this.client = new OpenAI({ apiKey })
     this.model = model
   }

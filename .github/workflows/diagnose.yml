@@ -53,6 +53,17 @@ jobs:
       - name: Install postgresql-client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
+      # `flyctl logs` replays a buffered backlog before it starts showing
+      # genuinely live lines, so starting it fresh right after the request
+      # (with only a short timeout) tends to time out before reaching the
+      # live tail. Starting it in the background now and letting it run
+      # underneath the rest of this job gives it time to catch up before we
+      # actually need it.
+      - name: Start background log capture
+        run: nohup flyctl logs -a vallorai-api > fly_logs.txt 2>&1 &
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       # Idempotent: fails harmlessly with "Email already registered" on repeat runs.
       - name: Register diagnostics user (idempotent)
         run: |
@@ -95,7 +106,8 @@ jobs:
             -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
             -d '{"message":"Salut, vreau o casa mica cu 2 camere.","language":"ro"}' || echo "request failed"
 
-      - name: Recent logs right after the chat call (20s capture)
-        run: timeout 20 flyctl logs -a vallorai-api || true
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Show captured logs
+        run: |
+          sleep 5
+          pkill -f "flyctl logs" || true
+          cat fly_logs.txt || true

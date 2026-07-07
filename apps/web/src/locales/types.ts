@@ -80,6 +80,8 @@ export interface Dictionary {
     toolSelect: string
     toolAddRoom: string
     toolAddWall: string
+    toolView2d: string
+    toolView3d: string
     selectRoomHint: string
     selectedRoomLabel: string
     area: string
@@ -105,6 +107,9 @@ export interface Dictionary {
         FINISH: string
         PAINT: string
       }
+    }
+    viewer3d: {
+      lodLabel: string
     }
   }
   aiChat: {

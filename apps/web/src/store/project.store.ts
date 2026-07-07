@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-interface Room {
+export interface Room {
   id: string
   type: string
   name: string
@@ -12,7 +12,7 @@ interface Room {
   posY?: number
 }
 
-interface Wall {
+export interface Wall {
   id: string
   startX: number
   startY: number
@@ -20,9 +20,11 @@ interface Wall {
   endY: number
   floor: number
   thickness: number
+  height: number
+  isExterior: boolean
 }
 
-interface House {
+export interface House {
   id: string
   floors: number
   totalArea?: number
@@ -37,11 +39,13 @@ interface ProjectStore {
   selectedRoomId: string | null
   selectedWallId: string | null
   editorMode: 'select' | 'add-room' | 'add-wall'
+  viewMode: '2d' | '3d'
   setActiveProject: (id: string) => void
   setHouse: (house: House) => void
   selectRoom: (id: string | null) => void
   selectWall: (id: string | null) => void
   setEditorMode: (mode: ProjectStore['editorMode']) => void
+  setViewMode: (mode: ProjectStore['viewMode']) => void
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
@@ -50,9 +54,11 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   selectedRoomId: null,
   selectedWallId: null,
   editorMode: 'select',
+  viewMode: '2d',
   setActiveProject: (id) => set({ activeProjectId: id }),
   setHouse: (house) => set({ house }),
   selectRoom: (id) => set({ selectedRoomId: id, selectedWallId: null }),
   selectWall: (id) => set({ selectedWallId: id, selectedRoomId: null }),
   setEditorMode: (mode) => set({ editorMode: mode }),
+  setViewMode: (mode) => set({ viewMode: mode }),
 }))

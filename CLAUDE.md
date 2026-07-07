@@ -173,11 +173,38 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
   foundation/roof/MEP keep the flat rate — no real BOQ source yet). Same `CostItem[]`+`total`+
   `currency` contract preserved. Covered by `apps/api/test/cost-boq.e2e-spec.ts`.
 
-### Next (Steps 5–9, not started)
+- **Step 5 — React Three Fiber viewer foundation**: `@react-three/fiber` (`^8.18.0`) +
+  `@react-three/drei` (`^9.122.0`) added to `apps/web` — pinned to the last React-18-compatible
+  major of each (v9 fiber / v11 drei require React 19, and the app is on `react@^18.3.1`). New
+  `apps/web/src/components/viewer3d/`:
+  - `Viewer3D.tsx` — the `<Canvas>` (lighting, grid, `OrbitControls`), swapped in for
+    `FloorPlanCanvas` when `viewMode` is `'3d'`.
+  - `HouseScene.tsx` — centers the house at the origin (bounding-box of all wall/room
+    coordinates) and maps `Wall`/`Room` rows into meshes.
+  - `WallMesh.tsx` — one extruded box per wall (length/height/thickness from the row, positioned
+    and rotated from its start/end points); no brick detail yet.
+  - `RoomFloor.tsx` — a thin floor slab per room, same color-by-type coding as the 2D canvas.
+  - `useLOD.ts` — the camera-distance LOD scaffold: `far`/`medium`/`detail` tiers off two
+    placeholder distance thresholds (not yet perf-tuned against real geometry). Steps 6-9 hook
+    real brick/rebar geometry into this instead of re-deriving distance logic.
+  - A `viewMode: '2d' | '3d'` toggle (`project.store.ts`, `EditorToolbar.tsx`) switches the
+    editor's center panel between the Konva 2D canvas and the new 3D view. i18n'd in all 3
+    locales (`editor.toolView2d`/`toolView3d`/`viewer3d.lodLabel`).
+  - Browser-verified end-to-end: local Postgres + real API + a seeded test house (two rooms,
+    five exterior walls, one interior partition), navigated client-side into the editor (not a
+    hard reload — see the pre-existing SSR caveat below), toggled 2D↔3D, and confirmed the LOD
+    debug label changes from `far` to `medium` while orbiting/zooming.
+  - **Unrelated pre-existing issue found during verification, not fixed here**: a hard/direct
+    request to `/projects/:id/editor` 500s server-side with `Cannot find module 'canvas'` —
+    `react-konva`/`konva`'s optional Node canvas dependency isn't installed, so Next's SSR of
+    `FloorPlanCanvas.tsx` throws on a cold server-rendered hit of that route. Reproduces
+    identically on unmodified `main`, so it predates this work. The app's own `<Link>`
+    client-side navigation into the editor is unaffected. Worth a follow-up (add `canvas` as a
+    dependency, or `next/dynamic(..., { ssr: false })` for `FloorPlanCanvas`) but out of scope
+    for the BIM-detail viewer.
 
-5. **React Three Fiber viewer foundation** — add `@react-three/fiber`+`@react-three/drei` to
-   `apps/web`, new `apps/web/src/components/viewer3d/`, simple extruded-box walls/rooms first
-   (no brick detail), camera-distance LOD scaffold.
+### Next (Steps 6–9, not started)
+
 6. **Brick coursing + instancing, opening-free walls first** — pool one `InstancedMesh` per
    (material × floor), not per wall, to bound draw calls; validate real-world frame rate on a
    single wall in isolation before generalizing to a whole house. Disable real-time shadows on

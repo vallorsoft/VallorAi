@@ -82,6 +82,8 @@ export const hu = {
     toolSelect: 'Kijelölés',
     toolAddRoom: 'Szoba hozzáadása',
     toolAddWall: 'Fal hozzáadása',
+    toolView2d: '2D',
+    toolView3d: '3D',
     selectRoomHint: 'Válassz ki egy szobát a terven',
     selectedRoomLabel: 'Kiválasztott szoba',
     area: 'Terület',
@@ -108,6 +110,9 @@ export const hu = {
         FINISH: 'Glett',
         PAINT: 'Festés',
       },
+    },
+    viewer3d: {
+      lodLabel: 'Részletességi szint',
     },
   },
   aiChat: {

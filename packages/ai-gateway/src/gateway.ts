@@ -73,4 +73,11 @@ export class AIGateway {
   ): AsyncIterable<string> {
     return this.getAdapter(options.provider).stream(options)
   }
+
+  /** Providers with a real adapter configured (i.e. a non-empty API key was
+   * supplied) — lets callers decide whether a fallback provider actually
+   * exists before, say, offering to retry on one. */
+  configuredProviders(): ProviderName[] {
+    return Array.from(this.adapters.keys())
+  }
 }

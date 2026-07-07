@@ -117,6 +117,7 @@ export interface Dictionary {
     greeting2: string
     placeholder: string
     error: string
+    quotaExceeded: string
   }
   auth: {
     register: {
@@ -168,5 +169,14 @@ export interface Dictionary {
     emailInvalid: string
     passwordMin: string
     passwordRequired: string
+  }
+  adminAiSettings: {
+    title: string
+    description: string
+    toggleLabel: string
+    toggleHintOn: string
+    toggleHintOff: string
+    saving: string
+    accessDenied: string
   }
 }

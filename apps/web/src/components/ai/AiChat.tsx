@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
 import { api } from '@/lib/api'
 import { useTranslation } from '@/lib/useTranslation'
 
@@ -47,8 +48,9 @@ export function AiChat({ projectId }: AiChatProps) {
       // Use non-streaming chat for simplicity; swap to SSE stream for production
       await api.post(`/ai/projects/${projectId}/chat`, { message: text })
       await qc.invalidateQueries({ queryKey: ['conversation', projectId] })
-    } catch {
-      setStreamingContent(t.aiChat.error)
+    } catch (err) {
+      const code = axios.isAxiosError(err) ? err.response?.data?.error?.code : undefined
+      setStreamingContent(code === 'SERVICE_UNAVAILABLE' ? t.aiChat.quotaExceeded : t.aiChat.error)
     } finally {
       setSending(false)
     }

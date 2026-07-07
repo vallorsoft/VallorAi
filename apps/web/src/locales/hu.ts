@@ -120,6 +120,7 @@ export const hu = {
     greeting2: 'Mesélj arról a házról, amit szeretnél megtervezni.',
     placeholder: 'Írd le álmaid otthonát...',
     error: 'Hiba történt az AI-jal való kommunikáció során. Próbáld újra.',
+    quotaExceeded: 'Az AI asszisztens jelenleg nem elérhető (elérte az ingyenes keretet). Próbáld újra később.',
   },
   auth: {
     register: {
@@ -172,5 +173,17 @@ export const hu = {
     emailInvalid: 'Érvénytelen email cím',
     passwordMin: 'A jelszónak legalább 8 karakter hosszúnak kell lennie',
     passwordRequired: 'A jelszó megadása kötelező',
+  },
+  adminAiSettings: {
+    title: 'AI beállítások',
+    description:
+      'Szabályozza, hogy az AI asszisztens átválthat-e egy fizetős szolgáltatóra, ha az ingyenes keret (Gemini) elfogyott.',
+    toggleLabel: 'Fizetős AI szolgáltatók engedélyezése tartalékként',
+    toggleHintOn:
+      'Bekapcsolva — ha az ingyenes keret elfogy és egy fizetős szolgáltató be van állítva, az asszisztens azzal folytatja a válaszadást.',
+    toggleHintOff:
+      'Kikapcsolva — ha az ingyenes keret elfogy, az asszisztens egy ideiglenes elérhetetlenségi üzenetet mutat, ahelyett hogy fizetős szolgáltatót használna.',
+    saving: 'Mentés...',
+    accessDenied: 'Nincs jogosultságod ehhez az oldalhoz.',
   },
 } satisfies Dictionary

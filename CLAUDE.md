@@ -72,9 +72,28 @@ JWT Bearer tokens. accessToken expires in 15 min, refreshToken 30 days.
 Stored in localStorage by the web app; interceptor auto-refreshes on 401.
 
 ## AI configuration
-Set `AI_PROVIDER=claude` (default) or `openai` in `apps/api/.env`.
-Model defaults: `claude-sonnet-5` / `gpt-4o`.
+Set `AI_PROVIDER` in `apps/api/.env` — value is matched case-insensitively against `GEMINI`/`CLAUDE`/`OPENAI`
+(defaults to `GEMINI` if unset). Model defaults: `gemini-flash-latest` (Google's maintained alias to their
+current recommended flash model — do not pin a dated model name like `gemini-1.5-pro` again, Google retires
+these; see PROGRESS.md's 2026-07-07 incident note) / `claude-sonnet-5` / `gpt-4o`.
+`packages/ai-gateway`'s `AIGateway` only ever registers a provider that actually has a non-empty API key, so
+the app can never silently select a misconfigured/unfunded provider — as of this writing only `GEMINI_API_KEY`
+is set anywhere (Fly secrets or `.env`), so Gemini (free tier) is the only provider actually in use.
 System prompts (ro/en/hu, selected via `getSystemPromptForLanguage`): `apps/api/src/modules/ai/prompts/system.prompt.ts`
+
+**Free-tier quota exhaustion**: if the active provider's API call fails with a rate-limit/quota error
+(`AIQuotaExceededError`, detected in `packages/ai-gateway/src/errors.ts` and thrown by `GeminiAdapter`),
+`AiService` (`apps/api/src/modules/ai/ai.service.ts`) checks the `AppSettings.allowPaidAiProviders` flag
+(`apps/api/src/modules/settings`) before doing anything else:
+- If `true` **and** a different provider actually has a real API key configured, it retries the request on
+  that provider.
+- Otherwise it throws a `503 SERVICE_UNAVAILABLE` (surfaced to `apps/web`'s `AiChat.tsx` as a dedicated
+  `t.aiChat.quotaExceeded` message, not the generic error).
+`allowPaidAiProviders` defaults to `false` and can only be changed via `GET`/`PATCH /settings/ai`, restricted
+to the `SUPERADMIN` role (`RolesGuard`/`@Roles()` in `apps/api/src/common`) — there's a minimal toggle UI at
+`apps/web/src/app/(dashboard)/admin/ai-settings` (only linked from the sidebar for a `SUPERADMIN` user).
+No user is seeded as `SUPERADMIN` — promote one by hand (`UPDATE "User" SET role = 'SUPERADMIN' WHERE
+email = '...'`) once this ships.
 
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:
@@ -103,6 +122,10 @@ in the `add_material_assembly_reinforcement` migration).
 `Material.source` is `GENERIC_DEFAULT` (researched standard default) or `MANUFACTURER` (future
 marketplace product); `Material.supplierId` is already nullable-FK-ready for that later phase.
 
+`AppSettings` is a single-row table (fixed `id: "singleton"`) for app-wide `SUPERADMIN`-only toggles —
+started with `allowPaidAiProviders` (see "AI configuration"); add more columns to this same row rather than
+creating a new singleton table per setting.
+
 ## Romanian Building Rules
 Validated in `apps/api/src/modules/rules/rules.service.ts`.
 Returns `ValidationResult` with `violations[]`, `passedRules[]`, `permitReadiness` (%).
@@ -119,7 +142,11 @@ FREE · PRO · BUSINESS · ENTERPRISE
 
 ## User roles
 GUEST · USER · CLIENT · ARCHITECT · STRUCTURAL_ENGINEER · MEP_ENGINEER ·
-ELECTRICAL_ENGINEER · CONTRACTOR · MANUFACTURER · SUPPLIER · ADMIN
+ELECTRICAL_ENGINEER · CONTRACTOR · MANUFACTURER · SUPPLIER · ADMIN · SUPERADMIN
+
+`SUPERADMIN` is distinct from `ADMIN` — it's the only role allowed to change app-wide settings
+(currently just `AppSettings.allowPaidAiProviders`, see "AI configuration" above), enforced by the
+`RolesGuard`/`@Roles()` pair in `apps/api/src/common`. No user has this role by default.
 
 ## BIM-detail feature (brick/rebar-level 2D/3D detail) — status
 

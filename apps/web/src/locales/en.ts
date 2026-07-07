@@ -120,6 +120,7 @@ export const en = {
     greeting2: 'Tell me about the house you want to design.',
     placeholder: 'Describe your dream home...',
     error: 'Error communicating with the AI. Please try again.',
+    quotaExceeded: 'The AI assistant is temporarily unavailable (free quota reached). Please try again later.',
   },
   auth: {
     register: {
@@ -172,5 +173,17 @@ export const en = {
     emailInvalid: 'Invalid email',
     passwordMin: 'Password must be at least 8 characters',
     passwordRequired: 'Password is required',
+  },
+  adminAiSettings: {
+    title: 'AI settings',
+    description:
+      'Controls whether the AI assistant can fall back to a paid provider once the free tier (Gemini) quota is exhausted.',
+    toggleLabel: 'Allow paid AI providers as a fallback',
+    toggleHintOn:
+      'On — if the free quota is exhausted and a paid provider is configured, the assistant will keep responding using it.',
+    toggleHintOff:
+      'Off — if the free quota is exhausted, the assistant shows a temporary-unavailability message instead of using a paid provider.',
+    saving: 'Saving...',
+    accessDenied: "You don't have access to this page.",
   },
 } satisfies Dictionary

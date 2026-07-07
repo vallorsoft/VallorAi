@@ -24,6 +24,7 @@ enum UserRole {
   MANUFACTURER
   SUPPLIER
   ADMIN
+  SUPERADMIN
 }
 
 enum SubscriptionPlan {
@@ -484,4 +485,18 @@ model Document {
   updatedAt DateTime @updatedAt
 
   @@index([projectId])
+}
+
+// =====================
+// APP-WIDE SETTINGS
+// =====================
+
+// Single-row table (id is always the fixed string below) — SUPERADMIN-only
+// controls that aren't tied to any one user or project. Started with just
+// the paid-AI-provider fallback gate; add more columns here as needed
+// rather than creating a new singleton table per setting.
+model AppSettings {
+  id                   String   @id @default("singleton")
+  allowPaidAiProviders Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
 }

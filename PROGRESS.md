@@ -7,8 +7,20 @@
 - **Web**: https://vallorai.fly.dev — deployed, stable
 - **DB**: Neon PostgreSQL, 13 tables pushed; `db-push` job runs automatically on every deploy
 - **Auth**: register + login confirmed working end-to-end on the live site
-- **AI provider**: Gemini (default), Claude and OpenAI adapters also wired in
+- **AI provider**: Gemini (`gemini-flash-latest`, default and — as of 2026-07-07 — the only one with a real
+  API key configured anywhere), Claude and OpenAI adapters wired in but unfunded
 - Nothing beyond signup/login has been exercised live yet — projects, editor, AI chat, costs, exports all exist in code but are unverified in production.
+
+**Incidents fixed 2026-07-07 (AI chat totally broken in production)**: two separate, back-to-back bugs, both
+found via the "Diagnose API" GitHub Actions workflow's new authenticated end-to-end AI-chat check (added the
+same day specifically because this environment can't reach the live API/DB directly):
+1. `AI_PROVIDER` Fly secret was `Gemini` (mixed case) vs. the gateway's exact-uppercase `GEMINI` lookup key —
+   fixed by normalizing case in `AIGateway` and only ever registering providers that have a real API key.
+2. Right after that shipped, chat still failed: Google had fully retired the `gemini-1.5-pro` model family
+   (404 on `generateContent`) — the hardcoded default in `ai.service.ts`. Switched to `gemini-flash-latest`.
+Also added, same day: a `SUPERADMIN`-gated paid-provider fallback for free-quota exhaustion (`AppSettings`
+model, `GET`/`PATCH /settings/ai`, minimal toggle UI) — see CLAUDE.md's "AI configuration" section for the
+full mechanism. No user is seeded as `SUPERADMIN` yet.
 
 ## Legend
 - ✅ Done

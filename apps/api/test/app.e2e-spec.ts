@@ -3,6 +3,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { ValidationPipe } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import request from 'supertest'
+import { prisma } from '@ai-home-designer/database'
 import { AppModule } from '../src/app.module'
 import { ResponseEnvelopeInterceptor } from '../src/common/interceptors/response-envelope.interceptor'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
@@ -38,17 +39,40 @@ describe('AppModule (e2e)', () => {
     await request(app.getHttpServer()).get('/api/v1/projects').expect(401)
   })
 
-  it('registers a user and returns tokens', async () => {
+  it('registers a user unverified, then issues tokens once the email is verified', async () => {
     const email = `smoke-${Date.now()}@example.com`
 
-    const response = await request(app.getHttpServer())
+    const registerRes = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({ email, password: 'Sup3rSecret!', name: 'Smoke Test' })
       .expect(201)
 
-    expect(response.body.success).toBe(true)
-    expect(response.body.data).toHaveProperty('accessToken')
-    expect(response.body.data).toHaveProperty('refreshToken')
+    expect(registerRes.body.success).toBe(true)
+    expect(registerRes.body.data).toEqual({ message: expect.any(String) })
+
+    // Login before verifying must be rejected.
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'Sup3rSecret!' })
+      .expect(403)
+
+    // No email inbox in tests — read the verification token straight from the DB,
+    // the same way a user would get it from the email link.
+    const user = await prisma.user.findUnique({ where: { email } })
+    const verifyRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/verify-email')
+      .send({ token: user?.verificationToken })
+      .expect(200)
+
+    expect(verifyRes.body.data).toHaveProperty('accessToken')
+    expect(verifyRes.body.data).toHaveProperty('refreshToken')
+
+    // Login now succeeds.
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'Sup3rSecret!' })
+      .expect(200)
+    expect(loginRes.body.data).toHaveProperty('accessToken')
   })
 
   it('returns a normalized validation error for an invalid registration payload', async () => {

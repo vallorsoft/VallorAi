@@ -8,6 +8,7 @@ type MockUser = {
   email: string
   password: string
   role: string
+  isVerified: boolean
 }
 
 describe('AuthService — forgot / reset password', () => {
@@ -32,6 +33,7 @@ describe('AuthService — forgot / reset password', () => {
         email: 'alice@example.com',
         password: bcrypt.hashSync('original-password-123', 12),
         role: 'USER',
+        isVerified: true,
       },
       tokens: new Map(),
     }
@@ -64,9 +66,14 @@ describe('AuthService — forgot / reset password', () => {
       }),
     } as unknown as typeof usersService
 
-    jwtService = { sign: jest.fn(), verify: jest.fn() }
+    jwtService = { sign: jest.fn(() => 'signed-jwt'), verify: jest.fn() }
+    const mailService = { sendVerificationEmail: jest.fn() }
 
-    authService = new AuthService(usersService as unknown as UsersService, jwtService as any)
+    authService = new AuthService(
+      usersService as unknown as UsersService,
+      mailService as any,
+      jwtService as any,
+    )
   })
 
   it('returns the generic success message for a nonexistent email without creating a token or leaking existence', async () => {

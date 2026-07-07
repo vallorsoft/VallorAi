@@ -3,9 +3,32 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { ValidationPipe } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import request from 'supertest'
+import { prisma } from '@ai-home-designer/database'
 import { AppModule } from '../src/app.module'
 import { ResponseEnvelopeInterceptor } from '../src/common/interceptors/response-envelope.interceptor'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
+
+// No email inbox in tests — register, then read the verification token
+// straight from the DB (the same value a user would get from the email
+// link) and verify with it to get real access tokens.
+async function registerAndVerify(
+  server: ReturnType<NestFastifyApplication['getHttpServer']>,
+  email: string,
+  name: string,
+): Promise<string> {
+  await request(server)
+    .post('/api/v1/auth/register')
+    .send({ email, password: 'Sup3rSecret!', name })
+    .expect(201)
+
+  const user = await prisma.user.findUnique({ where: { email } })
+  const verifyRes = await request(server)
+    .post('/api/v1/auth/verify-email')
+    .send({ token: user?.verificationToken })
+    .expect(200)
+
+  return verifyRes.body.data.accessToken
+}
 
 describe('Project versioning (e2e)', () => {
   let app: NestFastifyApplication
@@ -31,11 +54,7 @@ describe('Project versioning (e2e)', () => {
     server = app.getHttpServer()
 
     const email = `versioning-${Date.now()}@example.com`
-    const registerRes = await request(server)
-      .post('/api/v1/auth/register')
-      .send({ email, password: 'Sup3rSecret!', name: 'Versioning Test' })
-      .expect(201)
-    accessToken = registerRes.body.data.accessToken
+    accessToken = await registerAndVerify(server, email, 'Versioning Test')
 
     const projectRes = await request(server)
       .post('/api/v1/projects')
@@ -133,11 +152,7 @@ describe('Project versioning (e2e)', () => {
 
   it('rejects listing/restoring versions for a project owned by another user', async () => {
     const otherEmail = `versioning-other-${Date.now()}@example.com`
-    const otherRes = await request(server)
-      .post('/api/v1/auth/register')
-      .send({ email: otherEmail, password: 'Sup3rSecret!', name: 'Other User' })
-      .expect(201)
-    const otherToken = otherRes.body.data.accessToken
+    const otherToken = await registerAndVerify(server, otherEmail, 'Other User')
 
     await request(server)
       .get(`/api/v1/projects/${projectId}/versions`)

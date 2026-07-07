@@ -44,6 +44,8 @@ model User {
   country   String   @default("RO")
   avatarUrl String?
   isVerified Boolean @default(false)
+  verificationToken          String?   @unique
+  verificationTokenExpiresAt DateTime?
 
   projects  Project[]
   sessions  Session[]

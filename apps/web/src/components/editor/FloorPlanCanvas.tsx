@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { Stage, Layer, Rect, Line, Text, Group } from 'react-konva'
 import { useProjectStore } from '@/store/project.store'
+import { useTranslation } from '@/lib/useTranslation'
 
 const SCALE = 40 // pixels per meter
 const GRID = 1   // grid every 1m
@@ -20,6 +21,7 @@ const ROOM_COLORS: Record<string, string> = {
 
 export function FloorPlanCanvas() {
   const { house, selectRoom, selectedRoomId } = useProjectStore()
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const width = containerRef.current?.clientWidth ?? 800
   const height = containerRef.current?.clientHeight ?? 600
@@ -104,7 +106,7 @@ export function FloorPlanCanvas() {
 
       {!house && (
         <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">
-          Vorbește cu AI-ul pentru a genera planul casei
+          {t.editor.emptyCanvasHint}
         </div>
       )}
     </div>

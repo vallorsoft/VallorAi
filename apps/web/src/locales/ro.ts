@@ -90,6 +90,7 @@ export const ro = {
     floor: 'Etaj',
     deleteRoom: 'Șterge camera',
     deletingRoom: 'Se șterge...',
+    emptyCanvasHint: 'Vorbește cu AI-ul pentru a genera planul casei',
   },
   aiChat: {
     greeting1: 'Bună! Sunt asistentul tău AI arhitect.',

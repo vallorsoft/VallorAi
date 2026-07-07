@@ -88,6 +88,7 @@ export interface Dictionary {
     floor: string
     deleteRoom: string
     deletingRoom: string
+    emptyCanvasHint: string
   }
   aiChat: {
     greeting1: string

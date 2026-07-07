@@ -90,6 +90,7 @@ export const hu = {
     floor: 'Emelet',
     deleteRoom: 'Szoba törlése',
     deletingRoom: 'Törlés...',
+    emptyCanvasHint: 'Beszélj az AI-val a ház tervének elkészítéséhez',
   },
   aiChat: {
     greeting1: 'Szia! Én vagyok az AI építész asszisztensed.',

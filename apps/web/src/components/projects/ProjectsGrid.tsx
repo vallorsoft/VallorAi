@@ -15,7 +15,7 @@ export function ProjectsGrid() {
 
   const handleCreate = async () => {
     if (!name.trim()) return
-    await createProject.mutateAsync({ name, type: 'RESIDENTIAL' })
+    await createProject.mutateAsync({ name, type: 'FAMILY_HOUSE' })
     setName('')
     setShowModal(false)
   }

@@ -90,6 +90,7 @@ export const en = {
     floor: 'Floor',
     deleteRoom: 'Delete room',
     deletingRoom: 'Deleting...',
+    emptyCanvasHint: 'Talk to the AI to generate the house plan',
   },
   aiChat: {
     greeting1: "Hi! I'm your AI architect assistant.",

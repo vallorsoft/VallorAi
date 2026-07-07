@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-home-designer/ai-gateway": "workspace:*",
+    "@ai-home-designer/bim-engine": "workspace:*",
     "@ai-home-designer/database": "workspace:*",
     "@ai-home-designer/types": "workspace:*",
     "@fastify/static": "^7.0.0",

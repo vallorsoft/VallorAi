@@ -23,6 +23,9 @@ importers:
       '@ai-home-designer/ai-gateway':
         specifier: workspace:*
         version: link:../../packages/ai-gateway
+      '@ai-home-designer/bim-engine':
+        specifier: workspace:*
+        version: link:../../packages/bim-engine
       '@ai-home-designer/database':
         specifier: workspace:*
         version: link:../../packages/database

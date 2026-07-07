@@ -193,7 +193,7 @@ repo and did not persist between sessions — `CLAUDE.md` is the durable referen
 | 2 | `packages/bim-engine` — masonry running-bond + longitudinal rebar quantity/layout calc, own build step, wired into both Dockerfiles | ✅ |
 | 3 | 2D wall layer-inspector panel (`WallLayerPanel.tsx`), click-to-select wall, i18n'd, browser-verified RO/HU/EN | ✅ |
 | 4 | Cost engine BOQ integration — real per-material lines replace flat masonry/plastering/painting/insulation rates once wall data exists | ✅ |
-| 5 | React Three Fiber viewer foundation (extruded-box walls, LOD scaffold, no brick detail yet) | ⬜ |
+| 5 | React Three Fiber viewer foundation (extruded-box walls, LOD scaffold, no brick detail yet) | ✅ |
 | 6 | Brick coursing + instancing for opening-free walls, perf-validated on one wall first | ⬜ |
 | 7 | Opening-aware cut-brick generation (centimeter-precise, anchored from openings) — biggest remaining engineering risk | ⬜ |
 | 8 | Longitudinal rebar instancing | ⬜ |
@@ -203,6 +203,30 @@ Also still open: the new migration `20260707071500_add_material_assembly_reinfor
 not yet been applied to production Neon (needs the same manual baseline/deploy treatment as
 the Phase 0 migrations, via the existing `db-baseline-migrations.yml` workflow, once this
 branch merges to `main`).
+
+**Step 5 detail**: `@react-three/fiber` (`^8.18.0`) + `@react-three/drei` (`^9.122.0`) added to
+`apps/web` — pinned to the last React-18-compatible major of each (fiber v9/drei v11 require
+React 19), matching the existing `react@^18.3.1` pin. New
+`apps/web/src/components/viewer3d/` (`Viewer3D.tsx`, `HouseScene.tsx`, `WallMesh.tsx`,
+`RoomFloor.tsx`, `useLOD.ts`): walls render as extruded boxes (length/height/thickness from
+each `Wall` row, positioned/rotated from its start/end points), rooms as thin floor slabs
+color-coded like the 2D canvas. `useLOD` is the camera-distance LOD scaffold Step 6 will hook
+real brick/rebar geometry into — thresholds (8m/25m) are placeholders pending real frame-rate
+validation, not final numbers. A toggle in `EditorToolbar` (`viewMode` in `project.store.ts`)
+switches the center panel between the existing Konva 2D canvas and the new 3D view; fully
+i18n'd (ro/hu/en). Browser-verified against a real local Postgres + API + seeded test house
+(two rooms, five exterior walls, one interior partition) via client-side navigation — toggling
+2D↔3D and orbiting/zooming the 3D view (confirmed the LOD debug label changes from `far` to
+`medium` on zoom). No brick/rebar detail yet, per plan — that's Steps 6-9.
+
+Unrelated pre-existing issue noticed during verification, not introduced by Step 5 and not
+fixed here (out of scope): a direct/hard-reload request to `/projects/:id/editor` 500s server-side
+with `Cannot find module 'canvas'` — `react-konva`/`konva`'s optional Node canvas dependency
+isn't installed, so Next's SSR of `FloorPlanCanvas.tsx` throws on a cold server-rendered hit of
+that route. Reproduces identically on unmodified `main`. Client-side `<Link>` navigation into
+the editor (the only way the app's own UI reaches it) is unaffected. Worth a follow-up ticket
+(either add `canvas` as a dependency, or lazy-load `FloorPlanCanvas` with `next/dynamic` +
+`ssr: false`) but is separate from the BIM-detail viewer work.
 
 ---
 

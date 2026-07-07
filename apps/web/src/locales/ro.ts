@@ -82,6 +82,8 @@ export const ro = {
     toolSelect: 'Selectare',
     toolAddRoom: 'Adaugă cameră',
     toolAddWall: 'Adaugă perete',
+    toolView2d: '2D',
+    toolView3d: '3D',
     selectRoomHint: 'Selectează o cameră pe plan',
     selectedRoomLabel: 'Cameră selectată',
     area: 'Suprafață',
@@ -108,6 +110,9 @@ export const ro = {
         FINISH: 'Glet',
         PAINT: 'Vopsea',
       },
+    },
+    viewer3d: {
+      lodLabel: 'Nivel de detaliu',
     },
   },
   aiChat: {

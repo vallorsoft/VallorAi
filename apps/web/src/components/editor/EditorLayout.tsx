@@ -5,6 +5,7 @@ import { FloorPlanCanvas } from './FloorPlanCanvas'
 import { EditorToolbar } from './EditorToolbar'
 import { RoomPanel } from './RoomPanel'
 import { WallLayerPanel } from './WallLayerPanel'
+import { Viewer3D } from '@/components/viewer3d/Viewer3D'
 import { AiChat } from '@/components/ai/AiChat'
 import { useHouse } from '@/hooks/useProjects'
 import { useProjectStore } from '@/store/project.store'
@@ -13,7 +14,7 @@ import { useTranslation } from '@/lib/useTranslation'
 export function EditorLayout({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
   const { data: house } = useHouse(projectId)
-  const { setHouse, setActiveProject, selectedWallId } = useProjectStore()
+  const { setHouse, setActiveProject, selectedWallId, viewMode } = useProjectStore()
 
   useEffect(() => {
     setActiveProject(projectId)
@@ -34,7 +35,7 @@ export function EditorLayout({ projectId }: { projectId: string }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <EditorToolbar />
         <div className="flex-1 overflow-hidden">
-          <FloorPlanCanvas />
+          {viewMode === '3d' ? <Viewer3D /> : <FloorPlanCanvas />}
         </div>
       </div>
 

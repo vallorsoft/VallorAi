@@ -82,6 +82,8 @@ export const en = {
     toolSelect: 'Select',
     toolAddRoom: 'Add room',
     toolAddWall: 'Add wall',
+    toolView2d: '2D',
+    toolView3d: '3D',
     selectRoomHint: 'Select a room on the plan',
     selectedRoomLabel: 'Selected room',
     area: 'Area',
@@ -108,6 +110,9 @@ export const en = {
         FINISH: 'Skim coat',
         PAINT: 'Paint',
       },
+    },
+    viewer3d: {
+      lodLabel: 'Level of detail',
     },
   },
   aiChat: {

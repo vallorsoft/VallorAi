@@ -11,7 +11,7 @@ export class MailService {
 
   constructor(private readonly config: ConfigService) {
     this.apiKey = this.config.get('BREVO_API_KEY') ?? ''
-    this.senderEmail = this.config.get('BREVO_SENDER_EMAIL') ?? 'no-reply@vallorai.com'
+    this.senderEmail = this.config.get('BREVO_SENDER') ?? 'no-reply@vallorai.com'
     this.senderName = this.config.get('BREVO_SENDER_NAME') ?? 'AI Home Designer'
     this.frontendUrl = this.config.get('FRONTEND_URL') ?? 'http://localhost:3000'
   }

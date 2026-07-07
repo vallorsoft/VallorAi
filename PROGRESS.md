@@ -168,7 +168,7 @@ template is a separate, later task once the product has real users.
 | `login()`: reject with a clear error if `isVerified` is false | ✅ |
 | `POST /auth/verify-email` — validates token + expiry, sets `isVerified = true`, issues JWT tokens | ✅ |
 | `POST /auth/resend-verification` — regenerates token, resends email (covers expired/lost emails) | ✅ |
-| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` — Fly.io secrets + `.env.example` | ✅ |
+| `BREVO_API_KEY`, `BREVO_SENDER`, `BREVO_SENDER_NAME` — Fly.io secrets + `.env.example` | ✅ |
 | Web: `/verify-email?token=...` page that calls the endpoint and logs the user in on success | ✅ |
 
 Note: this branched (via `db push --accept-data-loss`) at the same time as the spec-audit
@@ -176,6 +176,15 @@ Phase 0/1 work above, which independently moved to real Prisma migrations. The
 `verificationToken`/`verificationTokenExpiresAt` columns were folded into the migration
 history as `20260707055000_add_email_verification` (sequenced between `init` and the
 versioning migration to match what's actually on production) when the two branches merged.
+
+**Bug fixed 2026-07-07**: verification/resend emails were never delivered in production.
+`mail.service.ts` read `BREVO_SENDER_EMAIL`, but the Fly secret was actually named
+`BREVO_SENDER` (confirmed via the "Diagnose API" workflow's `flyctl secrets list` output) —
+the name never matched, so the code silently fell back to the hardcoded
+`no-reply@vallorai.com` default sender instead of the real Brevo-verified address, and
+Brevo accepted the API call (register/resend both returned success) without ever actually
+delivering the mail. Fixed by reading `BREVO_SENDER` (matching what's actually deployed);
+`.env.example` renamed to match. No infra/secret change needed — code now matches reality.
 
 ---
 

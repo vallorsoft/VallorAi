@@ -15,6 +15,8 @@ export const en = {
     marketplace: 'Marketplace',
     settings: 'Settings',
     logout: 'Log out',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
   },
   landing: {
     headerLogin: 'Sign in',
@@ -79,6 +81,9 @@ export const en = {
   editor: {
     aiAssistantTitle: 'AI assistant',
     propertiesTitle: 'Properties',
+    mobileTabChat: 'AI assistant',
+    mobileTabPlan: 'Plan',
+    mobileTabProperties: 'Properties',
     toolSelect: 'Select',
     toolAddRoom: 'Add room',
     toolAddWall: 'Add wall',

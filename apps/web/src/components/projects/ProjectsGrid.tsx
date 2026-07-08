@@ -70,7 +70,7 @@ export function ProjectsGrid() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t.projectsGrid.namePlaceholder}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4"
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               autoFocus
             />

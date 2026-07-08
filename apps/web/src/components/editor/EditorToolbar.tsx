@@ -19,14 +19,14 @@ export function EditorToolbar() {
   ]
 
   return (
-    <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between gap-1 px-4">
+    <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between gap-2 px-2 sm:px-4 overflow-x-auto">
       <div className="flex items-center gap-1">
         {tools.map((tool) => (
           <button
             key={tool.mode}
             onClick={() => setEditorMode(tool.mode)}
             title={tool.label}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               editorMode === tool.mode
                 ? 'bg-brand-500 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -38,7 +38,7 @@ export function EditorToolbar() {
         ))}
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 shrink-0">
         {views.map((view) => (
           <button
             key={view.mode}

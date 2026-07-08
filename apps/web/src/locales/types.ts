@@ -30,6 +30,8 @@ export interface Dictionary {
     marketplace: string
     settings: string
     logout: string
+    openMenu: string
+    closeMenu: string
   }
   landing: {
     headerLogin: string
@@ -77,6 +79,9 @@ export interface Dictionary {
   editor: {
     aiAssistantTitle: string
     propertiesTitle: string
+    mobileTabChat: string
+    mobileTabPlan: string
+    mobileTabProperties: string
     toolSelect: string
     toolAddRoom: string
     toolAddWall: string

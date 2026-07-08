@@ -15,6 +15,8 @@ export const ro = {
     marketplace: 'Marketplace',
     settings: 'Setări',
     logout: 'Deconectare',
+    openMenu: 'Deschide meniul',
+    closeMenu: 'Închide meniul',
   },
   landing: {
     headerLogin: 'Autentificare',
@@ -79,6 +81,9 @@ export const ro = {
   editor: {
     aiAssistantTitle: 'Asistent AI',
     propertiesTitle: 'Proprietăți',
+    mobileTabChat: 'Asistent AI',
+    mobileTabPlan: 'Plan',
+    mobileTabProperties: 'Proprietăți',
     toolSelect: 'Selectare',
     toolAddRoom: 'Adaugă cameră',
     toolAddWall: 'Adaugă perete',

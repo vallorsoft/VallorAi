@@ -22,17 +22,17 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   if (!project) return <div className="p-6 text-gray-500">{t.projectDetail.notFound}</div>
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 break-words">{project.name}</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             {project.type} · {new Date(project.createdAt).toLocaleDateString(DATE_LOCALES[locale])}
           </p>
         </div>
         <Link
           href={`/projects/${projectId}/editor`}
-          className="bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors"
+          className="bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors text-center shrink-0"
         >
           {t.projectDetail.openEditor}
         </Link>

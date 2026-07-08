@@ -15,6 +15,8 @@ export const hu = {
     marketplace: 'Piactér',
     settings: 'Beállítások',
     logout: 'Kijelentkezés',
+    openMenu: 'Menü megnyitása',
+    closeMenu: 'Menü bezárása',
   },
   landing: {
     headerLogin: 'Bejelentkezés',
@@ -79,6 +81,9 @@ export const hu = {
   editor: {
     aiAssistantTitle: 'AI asszisztens',
     propertiesTitle: 'Tulajdonságok',
+    mobileTabChat: 'AI asszisztens',
+    mobileTabPlan: 'Terv',
+    mobileTabProperties: 'Tulajdonságok',
     toolSelect: 'Kijelölés',
     toolAddRoom: 'Szoba hozzáadása',
     toolAddWall: 'Fal hozzáadása',

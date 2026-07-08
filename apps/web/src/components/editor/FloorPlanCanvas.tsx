@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Stage, Layer, Rect, Line, Text, Group } from 'react-konva'
 import { useProjectStore } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
@@ -23,11 +23,24 @@ export function FloorPlanCanvas() {
   const { house, selectRoom, selectedRoomId, selectWall, selectedWallId } = useProjectStore()
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
-  const width = containerRef.current?.clientWidth ?? 800
-  const height = containerRef.current?.clientHeight ?? 600
+  const [{ width, height }, setSize] = useState({ width: 800, height: 600 })
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = () => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        setSize({ width: el.clientWidth, height: el.clientHeight })
+      }
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-gray-50">
+    <div ref={containerRef} className="relative w-full h-full bg-gray-50 overflow-hidden">
       <Stage width={width} height={height}>
         {/* Grid layer */}
         <Layer>

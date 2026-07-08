@@ -168,7 +168,7 @@ export function AiChat({ projectId }: AiChatProps) {
             }}
             placeholder={t.aiChat.placeholder}
             rows={1}
-            className="flex-1 resize-none px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-h-32"
+            className="flex-1 min-w-0 resize-none px-3 py-2 border border-gray-200 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-h-32"
           />
           <button
             onClick={sendMessage}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FloorPlanCanvas } from './FloorPlanCanvas'
+import dynamic from 'next/dynamic'
 import { EditorToolbar } from './EditorToolbar'
 import { RoomPanel } from './RoomPanel'
 import { WallLayerPanel } from './WallLayerPanel'
@@ -10,6 +10,13 @@ import { AiChat } from '@/components/ai/AiChat'
 import { useHouse } from '@/hooks/useProjects'
 import { useProjectStore } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
+
+// react-konva's optional Node "canvas" dependency isn't installed, so a server render of
+// FloorPlanCanvas throws on a hard/direct hit of the editor route — load it client-only.
+const FloorPlanCanvas = dynamic(
+  () => import('./FloorPlanCanvas').then((m) => m.FloorPlanCanvas),
+  { ssr: false },
+)
 
 type MobilePanel = 'chat' | 'plan' | 'properties'
 

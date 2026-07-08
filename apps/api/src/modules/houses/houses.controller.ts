@@ -85,4 +85,14 @@ export class HousesController {
   getFoundation(@Param('id') houseId: string) {
     return this.housesService.getFoundation(houseId)
   }
+
+  @Get(':id/tie-columns')
+  getTieColumns(@Param('id') houseId: string) {
+    return this.housesService.getTieColumns(houseId)
+  }
+
+  @Get('openings/:id/lintel')
+  getLintel(@Param('id') openingId: string) {
+    return this.housesService.getLintel(openingId)
+  }
 }

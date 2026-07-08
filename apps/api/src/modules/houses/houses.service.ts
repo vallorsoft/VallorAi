@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
-import { deriveFoundationSpec, resolveFrostDepthMm } from '@ai-home-designer/bim-engine'
+import {
+  deriveFoundationSpec,
+  resolveFrostDepthMm,
+  deriveTieColumnPlacements,
+  deriveTieColumnReinforcement,
+  deriveLintelSpec,
+  TIE_COLUMN_CROSS_SECTION_MM,
+  TIE_COLUMN_CONCRETE_CLASS,
+  type WallSegment,
+} from '@ai-home-designer/bim-engine'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
 @Injectable()
@@ -227,6 +236,130 @@ export class HousesService {
           concreteClass: spec.concreteClass,
         },
       ],
+    })
+  }
+
+  /**
+   * The house's confined-masonry tie-columns (stâlpișori), auto-provisioning
+   * S1 (corner/intersection) and S2 (max-spacing) placements on first
+   * access, idempotent like getFoundation. S3 (columns flanking a large
+   * opening in a high-seismic zone) is deliberately not generated — see
+   * packages/bim-engine confined-masonry.ts's module doc comment; a plain
+   * opening jamb correctly gets no column from this method.
+   */
+  async getTieColumns(houseId: string) {
+    const existing = await prisma.tieColumn.findFirst({ where: { houseId } })
+    if (!existing) {
+      const house = await prisma.house.findUniqueOrThrow({ where: { id: houseId }, include: { walls: true } })
+      await this.provisionTieColumns(house)
+    }
+    return prisma.tieColumn.findMany({
+      where: { houseId },
+      include: { reinforcementSpecs: true },
+      orderBy: [{ floor: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  private async provisionTieColumns(house: {
+    id: string
+    walls: {
+      id: string
+      startX: number
+      startY: number
+      endX: number
+      endY: number
+      floor: number
+      isExterior: boolean
+      isLoad: boolean
+    }[]
+  }) {
+    const reinforcement = deriveTieColumnReinforcement()
+    const floors = new Set(house.walls.map((w) => w.floor))
+
+    for (const floor of floors) {
+      const segments: WallSegment[] = house.walls
+        .filter((w) => w.floor === floor)
+        .map((w) => ({
+          id: w.id,
+          startX: w.startX,
+          startY: w.startY,
+          endX: w.endX,
+          endY: w.endY,
+          isLoadBearing: w.isExterior || w.isLoad,
+        }))
+      const placements = deriveTieColumnPlacements(segments)
+
+      for (const placement of placements) {
+        const tieColumn = await prisma.tieColumn.create({
+          data: {
+            houseId: house.id,
+            floor,
+            posX: placement.x,
+            posY: placement.y,
+            category: placement.category,
+            crossSectionMm: TIE_COLUMN_CROSS_SECTION_MM,
+            concreteClass: TIE_COLUMN_CONCRETE_CLASS,
+          },
+        })
+        await prisma.reinforcementSpec.createMany({
+          data: [
+            {
+              tieColumnId: tieColumn.id,
+              role: 'LONGITUDINAL',
+              barDiameterMm: reinforcement.longitudinal.diameterMm,
+              spacingMm: reinforcement.longitudinal.edgeSpacingMm,
+              barCount: reinforcement.longitudinal.barCount,
+              coverMm: reinforcement.longitudinal.coverMm,
+              concreteClass: TIE_COLUMN_CONCRETE_CLASS,
+            },
+            {
+              tieColumnId: tieColumn.id,
+              role: 'STIRRUP',
+              barDiameterMm: reinforcement.stirrup.diameterMm,
+              spacingMm: reinforcement.stirrup.spacingMm,
+              coverMm: reinforcement.stirrup.coverMm,
+              concreteClass: TIE_COLUMN_CONCRETE_CLASS,
+            },
+          ],
+        })
+      }
+    }
+  }
+
+  /**
+   * An opening's lintel (buiandrug), auto-provisioning a prefabricated
+   * default on first access, idempotent. Reinforcement is not modeled — see
+   * packages/bim-engine confined-masonry.ts's module doc comment (a
+   * prefabricated unit's reinforcement is internal to the manufactured
+   * product; monolithic lintel reinforcement has no cited primary source
+   * yet).
+   */
+  async getLintel(openingId: string) {
+    const existing = await prisma.lintel.findUnique({
+      where: { openingId },
+      include: { material: true },
+    })
+    if (existing) return existing
+
+    const opening = await prisma.opening.findUniqueOrThrow({
+      where: { id: openingId },
+      include: { wall: true },
+    })
+    const spec = deriveLintelSpec(opening.width * 1000, opening.wall.thickness * 1000)
+    const material = await prisma.material.findFirstOrThrow({
+      where: { name: 'Buiandrug prefabricat', source: 'GENERIC_DEFAULT' },
+    })
+
+    return prisma.lintel.create({
+      data: {
+        openingId,
+        materialId: material.id,
+        lengthMm: spec.lengthMm,
+        widthMm: spec.widthMm,
+        bearingLengthMm: spec.bearingLengthMm,
+        prefabricated: spec.prefabricated,
+      },
+      include: { material: true },
     })
   }
 

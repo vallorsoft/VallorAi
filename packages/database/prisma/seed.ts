@@ -113,6 +113,32 @@ async function main() {
       },
     },
     {
+      category: 'CONCRETE',
+      name: 'Beton C12/15',
+      standardRef: 'CR6-2013, Normativ 12/2008 Tab. 1',
+      unit: 'M3',
+      unitCostRON: 320,
+      specSheet: {
+        strengthClass: 'C12/15',
+        purpose: 'minimum class for confined-masonry confining elements (stâlpișori/centuri)',
+        priceVerified: false,
+        priceSource: 'Estimate pending Bursa Construcțiilor verification',
+      },
+    },
+    {
+      category: 'PRECAST',
+      name: 'Buiandrug prefabricat',
+      standardRef: 'Porotherm A12 (Wienerberger) product line, or equivalent',
+      unit: 'BUC',
+      unitCostRON: 45,
+      specSheet: {
+        bearingLengthMm: 250,
+        purpose: 'prefabricated lintel over a door/window opening — common default per manufacturer laying instructions',
+        priceVerified: false,
+        priceSource: 'Estimate pending manufacturer/supplier quote — price varies by length',
+      },
+    },
+    {
       category: 'REBAR',
       name: 'Oțel beton B500C',
       standardRef: 'SR 438-1:2012',

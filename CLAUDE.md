@@ -242,18 +242,78 @@ technical-press summaries of it), not from `docs/materials/`.
   - Not yet done: no UI panel (mirroring `WallLayerPanel`) surfaces this to the user yet; no cost
     engine BOQ line for the foundation (still the flat `structure: 800 RON/m²` rate).
 
+- **Module 2 — Confined masonry: stâlpișori (tie-columns) + buiandrug (lintels), CR6-2013**.
+  **Correction from the original module-2 plan above**: an earlier (unshipped) draft assumed a
+  tie-column was required flanking every door/window opening jamb. A user correction plus
+  follow-up research established this is wrong — CR6-2013 defines three tie-column categories:
+  **S1** (every corner/T/X wall-intersection, always required), **S2** (intermediate columns
+  limiting spacing to ≤4–5m along a run), and **S3** (columns flanking an opening, but only
+  *conditionally*: high-seismicity zones ag≥0.25g + openings ≥1.5m², or lower zones + openings
+  ≥2.5m², or when residual masonry pier-length minimums aren't met). This project has no cited
+  peak-ground-acceleration-by-locality table, so **only S1 and S2 are implemented**; S3 is a
+  documented gap, not a guess. A plain opening jamb correctly gets **no** column — instead,
+  every opening gets a **lintel (buiandrug)**, which is the actual, always-required tying-
+  together element over an opening (separately confirmed as standard/effectively-mandatory
+  practice, prefabricated by default).
+  - `packages/bim-engine/src/confined-masonry.ts` (unit-tested):
+    - `detectCornerAndIntersectionPoints` — S1 geometry: clusters load-bearing wall endpoints
+      (5cm tolerance) and flags non-collinear 2-way joins (a real corner, angle test at 5°
+      tolerance — a straight 2-wall collinear join is correctly *not* a corner, since it's one
+      physical run split into two `Wall` rows) and any ≥3-way junction; separately detects a
+      wall endpoint landing on another wall's *interior* span (a T-junction, e.g. an interior
+      partition meeting an exterior wall mid-run) via point-to-segment projection.
+    - `detectMidSpanTieColumns` — S2 geometry: for a load-bearing wall longer than
+      `MAX_TIE_COLUMN_SPACING_M` (4.0m — the conservative/tighter end of the cited 4–5m range,
+      since this project has no "sparse vs dense wall plan" classification to pick the looser
+      5m), evenly-spaced intermediate points so no gap exceeds the max.
+    - `deriveTieColumnReinforcement` — CR6-2013 constructive minimums: 250×250mm cross-section,
+      4×Ø14mm longitudinal (the *higher*-seismicity-zone bar size, used unconditionally as a
+      safe/conservative default in the absence of a cited ag-by-locality table — 4×Ø14 always
+      satisfies the lower-zone 4×Ø12 minimum too, just over-conservatively), Ø6mm stirrups at
+      150mm, 25mm cover (EN 1992-1-1 Table 4.4N, exposure class XC1 — dry/interior element),
+      C12/15 minimum confining-element concrete class (CR6-2013 / Normativ 12/2008 Tab. 1).
+    - `deriveLintelSpec` — prefabricated by default (Porotherm A12 or equivalent product line);
+      250mm bearing into the wall on each side (manufacturer datasheet — a separate secondary
+      source cites a much larger >400mm figure, but that appears to describe non-structural
+      infill-panel masonry in RC-frame buildings, not this case, so the datasheet figure is
+      used, flagged for engineer confirmation); length = opening width + 2×bearing; width =
+      wall thickness. Monolithic cast-in-place lintel reinforcement (bar count/diameter/
+      stirrups) has no primary-source citation this project could find — deliberately not
+      generated, not guessed.
+  - `ReinforcementSpec` gained `tieColumnId` (extending the polymorphic-parent CHECK to
+    wall/foundation/tie-column, exactly one) and a nullable `barCount` — a tie-column's 4 fixed
+    corner bars aren't a spacing-derived count the way a wall/footing mat's bars are, so
+    `spacingMm` alone (as used for those) couldn't represent it; `barCount` is set for the
+    tie-column's `LONGITUDINAL` row, left null elsewhere.
+  - New models: `TieColumn` (owned by `House` directly, not a specific `Wall` — a corner column
+    is naturally shared by the ≥2 walls that meet there) and `Lintel` (1:1 with `Opening`, FK to
+    a `Material` for the prefab product — no `ReinforcementSpec` relation, per the "not modeled"
+    reasoning above). `MaterialCategory` gained `PRECAST`. Seeded `Beton C12/15` and
+    `Buiandrug prefabricat` (Porotherm A12 citation) `GENERIC_DEFAULT` materials.
+  - `HousesService.getTieColumns(houseId)` (`GET /houses/:id/tie-columns`) auto-provisions S1+S2
+    placements (computed per floor) + their reinforcement, idempotent like `getFoundation`.
+    `HousesService.getLintel(openingId)` (`GET /houses/openings/:id/lintel`) auto-provisions one
+    `Lintel` per opening, idempotent. Covered by `apps/api/test/confined-masonry.e2e-spec.ts`
+    (corner placement, mid-span spacing, **no column beside a plain opening** — the corrected
+    behavior — lintel bearing/dimensions, idempotency of both).
+  - Not yet done: no UI panel; no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer
+    geometry (tie-columns would need their own instanced-box + bent-stirrup-loop rendering,
+    related to but not the same gap as the pre-existing Step 9 wall-stirrup gap).
+
 ### Next (not started, planned in order)
 
-- **Module 2 — Stâlpișori/centuri (confined-masonry tie-columns and ring beams, CR6-2013)** —
-  the largest of these modules: introduces a data-model concept that doesn't exist yet (a
-  vasbeton element embedded *in* a wall run, not a separate `Wall` row), with real placement
-  rules (every corner/T-junction/opening jamb, ≤4–5m spacing along a run) derived from wall/
-  opening geometry, plus their own constructive-minimum reinforcement (4×Ø12–14mm longitudinal,
-  Ø6mm stirrups at 10–15cm).
-- **Module 3 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
+- **S3 tie-columns** (opening-triggered) — needs a cited peak-ground-acceleration-by-locality
+  (ag) table (STAS-6054-77-style research, but for P100-1/2013 seismic zonation) and validated
+  minimum-pier-length thresholds; both are documented gaps in Module 2 above, not implemented.
+- **Module 3 — Centuri (ring beams)** — every floor level, ties the confining columns together
+  horizontally; not yet started (Module 2 above only covers the vertical tie-columns).
+- **Module 4 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
   non-confined-masonry (frame) house type exists; the project is masonry-only today.
-- Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing case
-  above (walls, slabs) — deliberately left open, not guessed.
+- Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing/
+  tie-column cases above (walls, slabs) — deliberately left open, not guessed.
+- Monolithic (non-prefabricated) lintel reinforcement — no primary-source citation found yet;
+  the prefabricated default (this module's actual output) doesn't need it, but a monolithic
+  override path eventually will.
 
 ## Deployment targets
 - **API**: Fly.io (Node.js)

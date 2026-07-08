@@ -11,6 +11,8 @@ const MORTAR_COLOR = '#b3aa99'
 
 interface WallMeshProps {
   wall: Wall
+  /** Base height of the wall's floor level in the stacked 3D view (m). */
+  elevationY?: number
   /** Door/window holes on this wall (wall-local meters — see store Opening). */
   openings?: Opening[]
   /**
@@ -69,7 +71,13 @@ function subtractOpenings(lengthM: number, heightM: number, openings: Opening[])
   return patches
 }
 
-export function WallMesh({ wall, openings = [], mortarCoreWidthM, translucent = false }: WallMeshProps) {
+export function WallMesh({
+  wall,
+  elevationY = 0,
+  openings = [],
+  mortarCoreWidthM,
+  translucent = false,
+}: WallMeshProps) {
   const { centerX, centerZ, rotationY, length } = useMemo(() => {
     const dx = wall.endX - wall.startX
     const dz = wall.endY - wall.startY
@@ -93,7 +101,7 @@ export function WallMesh({ wall, openings = [], mortarCoreWidthM, translucent = 
     // it — no z-fighting with the instanced brick faces.
     const coreThickness = Math.max(0.05, Math.min(wall.thickness, mortarCoreWidthM) - 0.02)
     return (
-      <group position={[centerX, 0, centerZ]} rotation={[0, rotationY, 0]}>
+      <group position={[centerX, elevationY, centerZ]} rotation={[0, rotationY, 0]}>
         {patches.map((p, i) => (
           <mesh
             key={i}
@@ -114,7 +122,7 @@ export function WallMesh({ wall, openings = [], mortarCoreWidthM, translucent = 
   }
 
   return (
-    <mesh position={[centerX, wall.height / 2, centerZ]} rotation={[0, rotationY, 0]}>
+    <mesh position={[centerX, elevationY + wall.height / 2, centerZ]} rotation={[0, rotationY, 0]}>
       <boxGeometry args={[length, wall.height, wall.thickness]} />
       <meshStandardMaterial
         color={wall.isExterior ? EXTERIOR_COLOR : INTERIOR_COLOR}

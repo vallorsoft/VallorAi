@@ -113,8 +113,10 @@ Fixed in `apps/api/src/modules/ai/`:
   placeholder rectangle from `suggested_area_sqm` alone (no floor-plan solver exists — see the
   BIM-detail roadmap above), and `DEFAULT_ROOM_HEIGHT_M` matching `Wall.height`'s default.
   `nextRoomPosition` lays each new room next to its floor's existing rooms, non-overlapping;
-  each floor's row is also offset in Y (`FLOOR_ROW_HEIGHT_M`) because `FloorPlanCanvas.tsx` has
-  no floor filter yet and draws every floor's rooms on the same flat view.
+  every floor's row starts at (0,0) — the old `FLOOR_ROW_HEIGHT_M` flat-view Y offset was
+  removed (2026-07-08, with a `flatten_room_rows` data migration inverting it on existing
+  rooms) once `FloorPlanCanvas` grew a real floor switcher and the 3D viewer started stacking
+  floors by elevation (see "AI rooms → generated walls" below).
 - `AiService.applyDesignUpdate` — called after every chat turn now. `ADD_ROOM` creates a room;
   `UPDATE_ROOM` looks for an existing room on the same floor with an exact `type` match and
   updates it in place, else falls back to creating one (the AI's `room_type` wording drifts
@@ -137,11 +139,40 @@ Fixed in `apps/api/src/modules/ai/`:
   `ProjectsService.assertOwnership` the rest of the app uses (made public for this reuse) —
   `chat`/`stream`/`conversation`/`rebuild` previously had no ownership check at all.
 
-Known pre-existing gaps this didn't touch: `FloorPlanCanvas.tsx` has no floor switcher (all
-floors render flat, hence the Y-offset placeholder above); the 3D viewer doesn't stack floors by
-elevation either; no walls are ever created from the AI conversation (the system prompt lists
-`ADD_WALL` as a possible action but the model has never been observed to emit one with usable
-geometry, and the manual "Adaugă perete" toolbar mode isn't wired to the API yet regardless).
+### AI rooms → generated walls + real floor handling (fixed 2026-07-08)
+
+The gaps the paragraph above used to document are now closed (a real user hit all of them at
+once: their AI-designed 2-storey house rendered as a few flat grey slabs — no walls, no bricks,
+floors splayed side by side):
+- **Walls are now derived from the AI's rooms.** `packages/bim-engine/src/wall-generation.ts`
+  (pure, unit-tested): `deriveWallsFromRooms` turns each floor's room rectangles into wall
+  segments — perimeter edges become exterior load-bearing walls (0.38m, matching the default
+  Leiertherm 38 assembly), edges shared by two rooms become ONE interior partition (0.24m,
+  matching the default solid-brick assembly). Near-parallel edges cluster within
+  `LINE_CLUSTER_TOLERANCE_M` (0.45m) so the mapper's 0.3m inter-room gap reads as one shared
+  wall, and interval endpoints snap to the perpendicular wall lines so facades run continuously
+  across rooms instead of leaving corner slits. Honest placeholder geometry, not a floor-plan
+  solver — same stance as `ROOM_ASPECT_RATIO`.
+- `Wall.isGenerated` (migration `add_wall_is_generated_flatten_room_rows`) marks derived walls;
+  `HousesService.regenerateGeneratedWalls` deletes+re-derives them (one transaction) after every
+  AI ADD_ROOM/UPDATE_ROOM, on rebuild, and on room deletion when generated walls exist.
+  User-drawn walls are never touched. Because assemblies auto-provision lazily on read
+  (`getWallLayers`), regenerated walls immediately carry real material stacks — so the 3D brick
+  detail tier and the cost engine's wall BOQ work on AI-designed houses with no extra step.
+  Covered by `apps/api/test/wall-generation.e2e-spec.ts`.
+- **2D floor switcher**: `EditorToolbar` shows a Parter/Etaj n/Subsol segmented control (i18n'd
+  `editor.floorGround`/`floorUpper`/`floorBasement`, hidden for single-floor houses);
+  `FloorPlanCanvas` filters rooms+walls by `project.store.ts`'s `activeFloor` (switching clears
+  the selection).
+- **3D floor stacking**: `HouseScene` lifts every room slab, wall mesh and brick/rebar instance
+  pool to `floor * LEVEL_HEIGHT_M` (2.7m — a rendering constant matching `Wall.height`'s
+  default, not a storey-height spec; there is still no slab/storey model).
+
+Still open: the manual "Adaugă perete" toolbar mode isn't wired to the API; the AI's `ADD_WALL`
+action remains unhandled (never observed to carry usable geometry); no doors/windows are
+generated (an AI-designed house's walls have no openings until added via the API), and
+regenerating drops openings that were manually added to a *generated* wall (they cascade with
+the wall row — put openings on manual walls, or re-add them once the room plan settles).
 
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:

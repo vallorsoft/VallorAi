@@ -20,8 +20,13 @@ const ROOM_COLORS: Record<string, string> = {
 }
 
 export function FloorPlanCanvas() {
-  const { house, selectRoom, selectedRoomId, selectWall, selectedWallId } = useProjectStore()
+  const { house, selectRoom, selectedRoomId, selectWall, selectedWallId, activeFloor } =
+    useProjectStore()
   const { t } = useTranslation()
+  // One level at a time — the toolbar's floor switcher picks which; the 3D
+  // view is the one that shows all floors (stacked by elevation).
+  const rooms = house?.rooms.filter((room) => room.floor === activeFloor) ?? []
+  const walls = house?.walls.filter((wall) => wall.floor === activeFloor) ?? []
   const containerRef = useRef<HTMLDivElement>(null)
   const [{ width, height }, setSize] = useState({ width: 800, height: 600 })
 
@@ -64,7 +69,7 @@ export function FloorPlanCanvas() {
 
         {/* Rooms layer */}
         <Layer>
-          {house?.rooms.map((room) => {
+          {rooms.map((room) => {
             const x = (room.posX ?? 0) * SCALE + 40
             const y = (room.posY ?? 0) * SCALE + 40
             const w = room.width * SCALE
@@ -100,7 +105,7 @@ export function FloorPlanCanvas() {
 
         {/* Walls layer */}
         <Layer>
-          {house?.walls.map((wall) => {
+          {walls.map((wall) => {
             const selected = selectedWallId === wall.id
             return (
               <Line

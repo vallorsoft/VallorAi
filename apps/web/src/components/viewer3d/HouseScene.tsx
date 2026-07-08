@@ -13,6 +13,16 @@ import { RebarInstances } from './RebarInstances'
 import { useRebarInstances } from './useRebarInstances'
 import { useLOD } from './useLOD'
 
+/**
+ * Vertical distance between floor levels in the stacked 3D view. Matches
+ * Wall.height's schema default (2.7m) — a rendering constant for the
+ * placeholder stacking, not a structural storey-height spec (there is no
+ * per-floor slab/storey model yet).
+ */
+const LEVEL_HEIGHT_M = 2.7
+
+const floorElevation = (floor: number) => floor * LEVEL_HEIGHT_M
+
 function houseBounds(house: House) {
   const xs: number[] = []
   const zs: number[] = []
@@ -96,7 +106,7 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   return (
     <group position={[-centerX, 0, -centerZ]}>
       {house.rooms.map((room) => (
-        <RoomFloor key={room.id} room={room} />
+        <RoomFloor key={room.id} room={room} elevationY={floorElevation(room.floor)} />
       ))}
       {house.walls.map((wall) => {
         const brickInfo = showBricks ? brickWalls.get(wall.id) : undefined
@@ -104,6 +114,7 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
           <WallMesh
             key={wall.id}
             wall={wall}
+            elevationY={floorElevation(wall.floor)}
             openings={openingsByWall.get(wall.id)}
             mortarCoreWidthM={brickInfo?.brickWidthM}
             // Rebar sits inside the element — the abstract box goes
@@ -112,8 +123,20 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
           />
         )
       })}
-      {showBricks && pools.map((pool) => <BrickInstances key={pool.key} pool={pool} />)}
-      {showRebar && rebar.pools.map((pool) => <RebarInstances key={pool.key} pool={pool} />)}
+      {/* Instance matrices are composed wall-local with base y=0 (per floor
+          pool) — lift each pool to its floor's level here. */}
+      {showBricks &&
+        pools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.floor)}>
+            <BrickInstances pool={pool} />
+          </group>
+        ))}
+      {showRebar &&
+        rebar.pools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.floor)}>
+            <RebarInstances pool={pool} />
+          </group>
+        ))}
       <Html fullscreen>
         <div className="absolute top-3 right-3 rounded-md bg-white/90 px-2.5 py-1 text-xs text-gray-500 shadow-sm pointer-events-none">
           {t.editor.viewer3d.lodLabel}: {lodTier}

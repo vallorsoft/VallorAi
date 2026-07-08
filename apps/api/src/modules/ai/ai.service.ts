@@ -282,6 +282,7 @@ export class AiService {
           userId,
         )
         await this.housesService.recalculateTotalArea(house.id)
+        await this.housesService.regenerateGeneratedWalls(house.id, userId)
         return { action: 'updated', name: mapped.name, area: updated.area, floor: updated.floor }
       }
     }
@@ -290,7 +291,7 @@ export class AiService {
       where: { houseId: house.id, floor: mapped.floor },
       select: { posX: true, width: true },
     })
-    const { posX, posY } = nextRoomPosition(roomsOnFloor, mapped.floor)
+    const { posX, posY } = nextRoomPosition(roomsOnFloor)
 
     const created = await this.housesService.addRoom(
       house.id,
@@ -298,6 +299,7 @@ export class AiService {
       userId,
     )
     await this.housesService.recalculateTotalArea(house.id)
+    await this.housesService.regenerateGeneratedWalls(house.id, userId)
 
     return { action: 'created', name: mapped.name, area: created.area, floor: created.floor }
   }

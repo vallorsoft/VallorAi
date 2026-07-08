@@ -82,6 +82,9 @@ export interface Dictionary {
     mobileTabChat: string
     mobileTabPlan: string
     mobileTabProperties: string
+    floorGround: string
+    floorUpper: string
+    floorBasement: string
     toolSelect: string
     toolAddRoom: string
     toolAddWall: string

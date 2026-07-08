@@ -58,12 +58,15 @@ interface ProjectStore {
   selectedWallId: string | null
   editorMode: 'select' | 'add-room' | 'add-wall'
   viewMode: '2d' | '3d'
+  /** Floor level shown by the 2D canvas (the 3D view stacks all floors). */
+  activeFloor: number
   setActiveProject: (id: string) => void
   setHouse: (house: House) => void
   selectRoom: (id: string | null) => void
   selectWall: (id: string | null) => void
   setEditorMode: (mode: ProjectStore['editorMode']) => void
   setViewMode: (mode: ProjectStore['viewMode']) => void
+  setActiveFloor: (floor: number) => void
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
@@ -73,10 +76,12 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   selectedWallId: null,
   editorMode: 'select',
   viewMode: '2d',
+  activeFloor: 0,
   setActiveProject: (id) => set({ activeProjectId: id }),
   setHouse: (house) => set({ house }),
   selectRoom: (id) => set({ selectedRoomId: id, selectedWallId: null }),
   selectWall: (id) => set({ selectedWallId: id, selectedRoomId: null }),
   setEditorMode: (mode) => set({ editorMode: mode }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  setActiveFloor: (floor) => set({ activeFloor: floor, selectedRoomId: null, selectedWallId: null }),
 }))

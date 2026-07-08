@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
 import {
   deriveFoundationSpec,
+  deriveWallsFromRooms,
   resolveFrostDepthMm,
   resolveSeismicAg,
   deriveTieColumnPlacements,
@@ -12,6 +13,7 @@ import {
   CENTURA_CONCRETE_CLASS,
   TIE_COLUMN_CROSS_SECTION_MM,
   TIE_COLUMN_CONCRETE_CLASS,
+  type RoomFootprint,
   type WallSegment,
   type WallOpeningForConfinement,
   type CenturaWallSegment,
@@ -64,7 +66,18 @@ export class HousesService {
 
   async removeRoom(roomId: string, userId: string) {
     const room = await prisma.room.delete({ where: { id: roomId } })
-    await this.projectVersions.snapshotHouse(room.houseId, userId)
+    // Keep auto-generated walls in step with the rooms they were derived
+    // from (e.g. deleting the stale duplicate an UPDATE_ROOM type-drift can
+    // leave behind). Houses without generated walls are left untouched.
+    const hasGenerated = await prisma.wall.findFirst({
+      where: { houseId: room.houseId, isGenerated: true },
+      select: { id: true },
+    })
+    if (hasGenerated) {
+      await this.regenerateGeneratedWalls(room.houseId, userId)
+    } else {
+      await this.projectVersions.snapshotHouse(room.houseId, userId)
+    }
     return room
   }
 
@@ -91,6 +104,52 @@ export class HousesService {
     const opening = await prisma.opening.create({ data: { houseId, wallId, ...data } })
     await this.projectVersions.snapshotHouse(houseId, userId)
     return opening
+  }
+
+  /**
+   * Re-derives the house's auto-generated wall set from its current room
+   * rectangles (bim-engine wall-generation): deletes every wall previously
+   * marked isGenerated and creates the fresh set, in one transaction.
+   * User-drawn walls (isGenerated=false) are never touched. This is what
+   * gives an AI-designed house actual walls — the chat only ever emits
+   * rooms — so the 3D viewer, the brick-detail tier and the wall BOQ all
+   * have real geometry to work from. Layer stacks on the deleted walls
+   * cascade away and re-provision lazily on next access (getWallLayers), so
+   * regenerated walls keep picking up the default assemblies.
+   */
+  async regenerateGeneratedWalls(houseId: string, userId: string) {
+    const rooms = await prisma.room.findMany({ where: { houseId } })
+    const footprints: RoomFootprint[] = rooms
+      .filter((r) => r.width > 0 && r.area > 0)
+      .map((r) => ({
+        id: r.id,
+        floor: r.floor,
+        posX: r.posX,
+        posY: r.posY,
+        widthM: r.width,
+        depthM: r.area / r.width,
+      }))
+    const segments = deriveWallsFromRooms(footprints)
+
+    await prisma.$transaction([
+      prisma.wall.deleteMany({ where: { houseId, isGenerated: true } }),
+      prisma.wall.createMany({
+        data: segments.map((s) => ({
+          houseId,
+          floor: s.floor,
+          startX: s.startX,
+          startY: s.startY,
+          endX: s.endX,
+          endY: s.endY,
+          thickness: s.thicknessM,
+          isLoad: s.isLoadBearing,
+          isExterior: s.isExterior,
+          isGenerated: true,
+        })),
+      }),
+    ])
+    await this.projectVersions.snapshotHouse(houseId, userId)
+    return { wallCount: segments.length }
   }
 
   async recalculateTotalArea(houseId: string) {

@@ -56,20 +56,32 @@ describe('Confined masonry law module — CR6-2013 stâlpișori + buiandrug (e2e
     await app.close()
   })
 
-  async function createProjectAndHouse() {
+  async function createProjectReturningIds() {
     const projectRes = await request(server)
       .post('/api/v1/projects')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ name: `Confined Masonry Test ${Date.now()}-${Math.random()}` })
       .expect(201)
-    const projectId = projectRes.body.data.id
+    const projectId = projectRes.body.data.id as string
 
     const houseRes = await request(server)
       .post(`/api/v1/houses/projects/${projectId}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ floors: 1, roofType: 'GABLED' })
       .expect(201)
-    return houseRes.body.data.id as string
+    return { projectId, houseId: houseRes.body.data.id as string }
+  }
+
+  async function createProjectAndHouse() {
+    return (await createProjectReturningIds()).houseId
+  }
+
+  async function setPlotCounty(projectId: string, county: string) {
+    await request(server)
+      .patch(`/api/v1/projects/${projectId}/plot`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ county })
+      .expect(200)
   }
 
   async function addWall(
@@ -86,6 +98,18 @@ describe('Confined masonry law module — CR6-2013 stâlpișori + buiandrug (e2e
       .send({ startX, startY, endX, endY, floor: 0, thickness, isExterior: true })
       .expect(201)
     return res.body.data.id as string
+  }
+
+  async function addOpening(
+    houseId: string,
+    wallId: string,
+    opts: { type?: string; position: number; width: number; height: number; sillHeight?: number },
+  ) {
+    await request(server)
+      .post(`/api/v1/houses/${houseId}/openings`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ type: opts.type ?? 'WINDOW', sillHeight: opts.sillHeight ?? 0.9, ...opts, wallId })
+      .expect(201)
   }
 
   describe('GET /houses/:id/tie-columns', () => {
@@ -174,6 +198,47 @@ describe('Confined masonry law module — CR6-2013 stâlpișori + buiandrug (e2e
         .expect(200)
 
       expect(second.body.data).toHaveLength(first.body.data.length)
+    })
+
+    it('places S3 columns at both jambs of a large opening (default high-seismic zone)', async () => {
+      // No Plot set -> seismic.ts falls back conservatively to the high-
+      // seismicity threshold (1.5 m²). A lone 4m wall (no corners, under S2
+      // spacing) with a 2.0x1.5 = 3.0 m² window -> only the 2 S3 jamb columns.
+      const houseId = await createProjectAndHouse()
+      const wallId = await addWall(houseId, 0, 0, 4, 0)
+      await addOpening(houseId, wallId, { position: 1, width: 2, height: 1.5 })
+
+      const res = await request(server)
+        .get(`/api/v1/houses/${houseId}/tie-columns`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200)
+
+      const columns = res.body.data
+      expect(columns).toHaveLength(2)
+      expect(columns.every((c: { category: string }) => c.category === 'S3')).toBe(true)
+      const xs = columns.map((c: { posX: number }) => c.posX).sort((a: number, b: number) => a - b)
+      expect(xs).toEqual([1, 3]) // near jamb at 1m, far jamb at 1+2=3m
+      // S3 columns carry the same CR6-2013 reinforcement as S1/S2.
+      const longitudinal = columns[0].reinforcementSpecs.find(
+        (s: { role: string }) => s.role === 'LONGITUDINAL',
+      )
+      expect(longitudinal.barDiameterMm).toBe(14)
+    })
+
+    it('applies the looser 2.5 m² threshold in a low-seismic zone (Cluj, 0.10g)', async () => {
+      // A 2.0 m² opening: confined in the default high zone, but NOT in Cluj
+      // (ag=0.10g -> 2.5 m² threshold). Verifies the ag lookup drives S3.
+      const { projectId, houseId } = await createProjectReturningIds()
+      await setPlotCounty(projectId, 'Cluj')
+      const wallId = await addWall(houseId, 0, 0, 4, 0)
+      await addOpening(houseId, wallId, { position: 1, width: 1.6, height: 1.25 }) // 2.0 m²
+
+      const res = await request(server)
+        .get(`/api/v1/houses/${houseId}/tie-columns`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200)
+
+      expect(res.body.data).toHaveLength(0)
     })
   })
 

@@ -4,21 +4,34 @@
 // opening. Pure, deterministic geometry + constructive-minimum rules; not a
 // load-bearing structural design (see foundation.ts's same disclaimer).
 //
-// Scope of this module, deliberately: only the S1 (corner/intersection) and
-// S2 (max-spacing) tie-column categories, and lintels. CR6-2013 also
-// defines an S3 category — tie-columns flanking a sufficiently large
-// opening in a sufficiently high seismic zone (ag) — which this module does
-// NOT implement: it needs a cited peak-ground-acceleration-by-locality
-// table (which does not exist in this codebase yet, only a handful of
-// individually-cited cities from earlier research) and validated
-// pier-length thresholds this project could not confirm against a primary
-// source. Implementing S3 with a guessed ag or an unconfirmed threshold
-// would violate CLAUDE.md Key rule 7 — it is a documented gap, not an
-// oversight. A plain opening jamb correctly gets NO tie-column from this
-// module, which corrects an earlier (unshipped) draft that treated every
-// opening jamb as S1 — CR6-2013 does not require that; the lintel over the
-// opening plus the S1/S2 columns elsewhere in the run do the tying-together
-// job for an ordinary residential opening.
+// Scope of this module: the S1 (corner/intersection), S2 (max-spacing) and
+// S3 (large-opening, seismic-zone-dependent) tie-column categories, plus
+// lintels. CR6-2013's three categories:
+//   S1 — every wall corner / T / X intersection (always required).
+//   S2 — intermediate columns limiting spacing along a run to <= 4–5m.
+//   S3 — columns flanking an opening, required ONLY conditionally: in
+//        high-seismicity zones (ag >= 0.25g) for openings with area
+//        >= 1.5 m², and in the rest of the territory (ag < 0.25g) for
+//        openings with area >= 2.5 m². A smaller opening in the same zone
+//        gets NO column (the lintel over it plus the S1/S2 columns
+//        elsewhere in the run do the tying-together job).
+// The two opening-area thresholds and the ag = 0.25g boundary were cross-
+// checked across two independent searches converging on identical values
+// (see OPENING_CONFINEMENT_* constants). The ag-by-locality input comes from
+// seismic.ts (P100-1/2013), which is honest about its citation confidence
+// and falls back conservatively (stricter threshold) for an unknown
+// locality — so S3 over-provisions rather than under-provisions when the
+// site's ag is unknown, never violating Key rule 7 with an invented number.
+//
+// Still a documented gap (NOT implemented here): the minimum residual
+// masonry-pier ("spalet") length below which an opening also triggers
+// confinement regardless of its area — this project could not confirm the
+// exact threshold against a primary source, so only the area+ag rule is
+// applied. An earlier (unshipped) draft treated every opening jamb as S1
+// unconditionally; that was wrong and is corrected here — a plain
+// below-threshold opening jamb gets no column.
+
+import { HIGH_SEISMICITY_AG_THRESHOLD_G } from './seismic'
 
 export interface WallSegment {
   id: string
@@ -26,16 +39,32 @@ export interface WallSegment {
   startY: number
   endX: number
   endY: number
-  /** Only load-bearing walls (isExterior || isLoad) participate in S1/S2 placement. */
+  /** Only load-bearing walls (isExterior || isLoad) participate in S1/S2/S3 placement. */
   isLoadBearing: boolean
 }
 
-export type TieColumnCategory = 'S1' | 'S2'
+export type TieColumnCategory = 'S1' | 'S2' | 'S3'
 
 export interface TieColumnPlacement {
   x: number
   y: number
   category: TieColumnCategory
+}
+
+/**
+ * One opening on a wall, in the form the S3 rule needs: which wall it sits
+ * on, how far along that wall its near jamb is (meters from the wall's start
+ * point), its width (meters), and its area (m² = width × height). Maps 1:1
+ * from an `Opening` row (position / width / width×height).
+ */
+export interface WallOpeningForConfinement {
+  wallId: string
+  /** Meters from the wall's start point to the near (start-side) jamb. */
+  position: number
+  /** Opening width in meters. */
+  width: number
+  /** Opening area in m² (width × height). */
+  areaSqm: number
 }
 
 // Points within this distance are treated as the same node (walls drawn by
@@ -196,12 +225,75 @@ export function detectMidSpanTieColumns(walls: WallSegment[]): Point[] {
   return results
 }
 
+// CR6-2013 opening-confinement (S3) rule: an opening must be flanked by
+// tie-columns at both jambs when its area reaches a threshold that depends
+// on the site's seismic zone. Both values, and the ag = 0.25g boundary
+// between them, were cross-checked across two independently-phrased searches
+// converging on identical figures (a "double window", ~1.5 m², in the red
+// zone; a "door", ~2.5 m², elsewhere).
+export const OPENING_CONFINEMENT_AREA_HIGH_SEISMIC_SQM = 1.5 // ag >= 0.25g
+export const OPENING_CONFINEMENT_AREA_LOW_SEISMIC_SQM = 2.5 // ag < 0.25g
+
 /**
- * Full S1+S2 tie-column placement for a house's (single-floor) wall set.
- * Caller passes one floor's walls at a time — this module is 2D/floor-
- * agnostic, matching the rest of bim-engine.
+ * The minimum opening area (m²) above which CR6-2013 requires S3 tie-columns
+ * flanking the opening, for a site with the given design ground acceleration
+ * `agG` (fraction of g). High-seismicity sites use the stricter (smaller)
+ * threshold.
  */
-export function deriveTieColumnPlacements(walls: WallSegment[]): TieColumnPlacement[] {
+export function openingConfinementThresholdSqm(agG: number): number {
+  return agG >= HIGH_SEISMICITY_AG_THRESHOLD_G
+    ? OPENING_CONFINEMENT_AREA_HIGH_SEISMIC_SQM
+    : OPENING_CONFINEMENT_AREA_LOW_SEISMIC_SQM
+}
+
+/**
+ * S3 tie-column locations: for every opening whose area reaches the seismic-
+ * zone-dependent confinement threshold, a column at each of its two jambs.
+ * An opening on a non-load-bearing wall, or on a wall not present in `walls`,
+ * is skipped. Jamb points are computed along the opening's host wall
+ * (near jamb at `position`, far jamb at `position + width` from the wall's
+ * start point). A below-threshold opening produces no columns.
+ */
+export function detectOpeningTieColumns(
+  walls: WallSegment[],
+  openings: WallOpeningForConfinement[],
+  agG: number,
+): Point[] {
+  const threshold = openingConfinementThresholdSqm(agG)
+  const byId = new Map(walls.map((w) => [w.id, w]))
+  const results: Point[] = []
+
+  for (const opening of openings) {
+    if (opening.areaSqm < threshold) continue
+    const wall = byId.get(opening.wallId)
+    if (!wall || !wall.isLoadBearing) continue
+
+    const start: Point = { x: wall.startX, y: wall.startY }
+    const end: Point = { x: wall.endX, y: wall.endY }
+    const u = unitDirection(start, end)
+    if (u.x === 0 && u.y === 0) continue // zero-length wall
+
+    const nearJamb: Point = { x: start.x + u.x * opening.position, y: start.y + u.y * opening.position }
+    const farParam = opening.position + opening.width
+    const farJamb: Point = { x: start.x + u.x * farParam, y: start.y + u.y * farParam }
+    results.push(nearJamb, farJamb)
+  }
+  return results
+}
+
+/**
+ * Full S1+S2+S3 tie-column placement for a house's (single-floor) wall set.
+ * Caller passes one floor's walls at a time — this module is 2D/floor-
+ * agnostic, matching the rest of bim-engine. S3 (opening-triggered) columns
+ * are only produced when `openings` are supplied; `agG` (the site's design
+ * ground acceleration, from seismic.ts) selects the confinement threshold.
+ * Passing no openings reproduces the original S1+S2-only behavior exactly.
+ */
+export function deriveTieColumnPlacements(
+  walls: WallSegment[],
+  openings: WallOpeningForConfinement[] = [],
+  agG = HIGH_SEISMICITY_AG_THRESHOLD_G,
+): TieColumnPlacement[] {
   const s1 = detectCornerAndIntersectionPoints(walls).map((p) => ({ ...p, category: 'S1' as const }))
   const s2Candidates = detectMidSpanTieColumns(walls)
   // Drop any S2 candidate that lands within tolerance of an S1 point (can
@@ -210,7 +302,19 @@ export function deriveTieColumnPlacements(walls: WallSegment[]): TieColumnPlacem
   const s2 = s2Candidates
     .filter((p) => !s1.some((c) => distance(c, p) <= NODE_TOLERANCE_M))
     .map((p) => ({ ...p, category: 'S2' as const }))
-  return [...s1, ...s2]
+
+  // S3 jambs, deduped against S1/S2 (a jamb landing on an existing corner or
+  // mid-span column is already confined — don't double it) and against each
+  // other (two adjacent openings sharing a narrow pier).
+  const placed: Point[] = [...s1, ...s2]
+  const s3: TieColumnPlacement[] = []
+  for (const p of detectOpeningTieColumns(walls, openings, agG)) {
+    if (placed.some((c) => distance(c, p) <= NODE_TOLERANCE_M)) continue
+    placed.push(p)
+    s3.push({ ...p, category: 'S3' as const })
+  }
+
+  return [...s1, ...s2, ...s3]
 }
 
 // CR6-2013 constructive minimums for a stâlpișor: ≥25x25cm cross-section.

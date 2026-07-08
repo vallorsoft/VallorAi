@@ -300,20 +300,78 @@ technical-press summaries of it), not from `docs/materials/`.
     geometry (tie-columns would need their own instanced-box + bent-stirrup-loop rendering,
     related to but not the same gap as the pre-existing Step 9 wall-stirrup gap).
 
+- **Module 3 — Centuri (ring beams)**. **Citation-confidence note**: before starting this
+  module, a dedicated research pass specifically tried OFFICIAL sources (ASRO, MDLPA,
+  legislatie.just.ro/Portal Legislativ, cnadnr.ro, INFP) per an explicit user requirement. Every
+  official PDF host tried returned HTTP 403 in this project's environment — a systematic block
+  (confirmed across many distinct domains and multiple attempts), not a one-off failure. The
+  numbers below come from `WebSearch`'s own synthesis of indexed secondary sources, but were
+  independently corroborated by **two separate queries converging on identical values** before
+  being accepted — higher confidence than a single-source citation, but still not a primary-text
+  quote. A structural engineer should confirm against a purchased/official copy of CR6-2013
+  before construction use, same as every other seeded structural default in this project.
+  - `packages/bim-engine/src/centura.ts` (unit-tested):
+    - `deriveCenturaLevels` — one centură per load-bearing wall at its own floor level (CR6-2013:
+      "provided in the plane of the walls at all floor levels"), **plus** a second centură
+      (reusing the topmost floor's wall footprints) one level above the top floor, for CR6-2013's
+      "level above the last residential level, for buildings with non-walkable attics" case. This
+      project has no walkable-vs-non-walkable-attic field on `House` yet, so the extra level is
+      always generated — the conservative default (an unneeded centură under a walkable attic is
+      merely extra, never a missing requirement), consistent with every other "default toward
+      more structure, not less" choice in these modules.
+    - `deriveCenturaHeightMm`/`deriveCenturaWidthMm` — height = floor-slab thickness for an
+      interior wall, **double** that for a perimeter (exterior) wall; width = wall thickness.
+      Slab thickness has no field anywhere in this schema yet, so it uses
+      `DEFAULT_SLAB_THICKNESS_MM = 130` — the upper (more conservative, since centură height
+      scales with it), cited end of STAS 10107/2-92's "12-13cm" typical residential
+      monolithic-slab-thickness range. The load/span-specific slab thickness a real floor needs
+      is a structural calculation this module does not perform.
+    - `deriveCenturaReinforcement` — longitudinal reinforcement ratio 0.5%, realized as bars at
+      the cited minimum Ø10mm, bar count derived from the ratio and floored at 4 (2 top + 2
+      bottom, the ordinary confining-element arrangement — occasionally more for a deep
+      perimeter centură where 4×Ø10 alone would fall under 0.5%). Ø6mm stirrups at ≤150mm.
+      Concrete class C12/15 and 25mm cover reuse the same confining-element minimums Module 2
+      already cited (CR6-2013 / Normativ 12/2008 Tab. 1; EN 1992-1-1 Table 4.4N XC1) — a bonus
+      finding from this module's research directly cross-checked and confirmed Module 2's
+      conservative 4×Ø14 tie-column choice (a cited by-seismic-zone table: 1% ratio at ag>0.25,
+      0.8% at ag=0.15–0.20, 0.6% at ag=0.10 — 4×Ø14 in a 250×250mm section satisfies all three).
+  - New `Centura` model, owned by `House` but tied to the specific `Wall` whose footprint it
+    follows (unlike `TieColumn`, a centură has real length/direction, not just a point) — `level`
+    distinguishes the wall's own floor from the extra above-top-floor case, so a topmost-floor
+    wall gets two `Centura` rows sharing one `wallId`. `ReinforcementSpec` gained `centuraId`
+    (widening the polymorphic-parent CHECK to 4 mutually-exclusive parents).
+  - `HousesService.getCenturi(houseId)` (`GET /houses/:id/centuri`) auto-provisions per-floor
+    placements + reinforcement, idempotent like `getFoundation`/`getTieColumns`. Covered by
+    `apps/api/test/centura.e2e-spec.ts` (own-level + above-top-floor placement, exterior-vs-
+    interior height doubling, idempotency).
+  - Not yet done: no UI panel; no cost engine BOQ lines; no 3D-viewer geometry; the wall-set-back
+    width variant (250mm when set back for exterior insulation) isn't modeled, only the
+    wall-thickness-matching width.
+
 ### Next (not started, planned in order)
 
 - **S3 tie-columns** (opening-triggered) — needs a cited peak-ground-acceleration-by-locality
   (ag) table (STAS-6054-77-style research, but for P100-1/2013 seismic zonation) and validated
-  minimum-pier-length thresholds; both are documented gaps in Module 2 above, not implemented.
-- **Module 3 — Centuri (ring beams)** — every floor level, ties the confining columns together
-  horizontally; not yet started (Module 2 above only covers the vertical tie-columns).
+  minimum-pier-length thresholds; both are documented gaps in Module 2, not implemented. The
+  Module 3 research pass found individual cited points (București ag=0.30g, Iași ag=0.25g) but
+  not a usable full by-locality table — still an open gap.
 - **Module 4 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
   non-confined-masonry (frame) house type exists; the project is masonry-only today.
 - Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing/
-  tie-column cases above (walls, slabs) — deliberately left open, not guessed.
+  tie-column/centură cases above (walls, slabs) — deliberately left open, not guessed. The
+  Module 3 research pass confirmed the table lives in NE 012/1-2022 Annex J but could not
+  retrieve the actual mm values (official PDF hosts systematically 403 in this environment).
 - Monolithic (non-prefabricated) lintel reinforcement — no primary-source citation found yet;
   the prefabricated default (this module's actual output) doesn't need it, but a monolithic
   override path eventually will.
+- **Future feature (not started, explicitly deferred by the user until the law-module sequence
+  finishes)**: an interactive editor where resizing a structural element (e.g. widening a door)
+  correctly re-details the rebar running through/around it — including inserting a lap splice
+  when a continuous bar run would exceed standard stock length, and precise corner bends — plus
+  the same edits triggerable via natural-language AI chat requests (extending
+  `design_update`/`AiService.applyDesignUpdate`). User-confirmed: rebar stock comes in both 6m
+  and 12m standard lengths. Splice-length/bend-radius formulas (EN 1992-1-1 §8.3/§8.7,
+  SR 438-1) still need their own official-source research pass before implementation.
 
 ## Deployment targets
 - **API**: Fly.io (Node.js)

@@ -95,4 +95,9 @@ export class HousesController {
   getLintel(@Param('id') openingId: string) {
     return this.housesService.getLintel(openingId)
   }
+
+  @Get(':id/centuri')
+  getCenturi(@Param('id') houseId: string) {
+    return this.housesService.getCenturi(houseId)
+  }
 }

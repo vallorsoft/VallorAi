@@ -6,9 +6,13 @@ import {
   deriveTieColumnPlacements,
   deriveTieColumnReinforcement,
   deriveLintelSpec,
+  deriveCenturaLevels,
+  deriveCenturaReinforcement,
+  CENTURA_CONCRETE_CLASS,
   TIE_COLUMN_CROSS_SECTION_MM,
   TIE_COLUMN_CONCRETE_CLASS,
   type WallSegment,
+  type CenturaWallSegment,
 } from '@ai-home-designer/bim-engine'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
@@ -361,6 +365,88 @@ export class HousesService {
       },
       include: { material: true },
     })
+  }
+
+  /**
+   * The house's ring beams (centuri), auto-provisioning one per load-bearing
+   * wall at its own floor level (plus one extra level above the topmost
+   * floor — see confined-masonry doc comment) on first access, idempotent
+   * like getFoundation/getTieColumns.
+   */
+  async getCenturi(houseId: string) {
+    const existing = await prisma.centura.findFirst({ where: { houseId } })
+    if (!existing) {
+      const house = await prisma.house.findUniqueOrThrow({ where: { id: houseId }, include: { walls: true } })
+      await this.provisionCenturi(house)
+    }
+    return prisma.centura.findMany({
+      where: { houseId },
+      include: { reinforcementSpecs: true },
+      orderBy: [{ level: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  private async provisionCenturi(house: {
+    id: string
+    walls: {
+      id: string
+      startX: number
+      startY: number
+      endX: number
+      endY: number
+      floor: number
+      thickness: number
+      isExterior: boolean
+      isLoad: boolean
+    }[]
+  }) {
+    const segments: CenturaWallSegment[] = house.walls.map((w) => ({
+      id: w.id,
+      startX: w.startX,
+      startY: w.startY,
+      endX: w.endX,
+      endY: w.endY,
+      floor: w.floor,
+      thicknessMm: w.thickness * 1000,
+      isLoadBearing: w.isExterior || w.isLoad,
+      isExterior: w.isExterior,
+    }))
+    const placements = deriveCenturaLevels(segments)
+
+    for (const placement of placements) {
+      const reinforcement = deriveCenturaReinforcement(placement.heightMm, placement.widthMm)
+      const centura = await prisma.centura.create({
+        data: {
+          houseId: house.id,
+          wallId: placement.wallId,
+          level: placement.level,
+          heightMm: placement.heightMm,
+          widthMm: placement.widthMm,
+          concreteClass: CENTURA_CONCRETE_CLASS,
+        },
+      })
+      await prisma.reinforcementSpec.createMany({
+        data: [
+          {
+            centuraId: centura.id,
+            role: 'LONGITUDINAL',
+            barDiameterMm: reinforcement.longitudinal.diameterMm,
+            spacingMm: reinforcement.longitudinal.edgeSpacingMm,
+            barCount: reinforcement.longitudinal.barCount,
+            coverMm: reinforcement.longitudinal.coverMm,
+            concreteClass: CENTURA_CONCRETE_CLASS,
+          },
+          {
+            centuraId: centura.id,
+            role: 'STIRRUP',
+            barDiameterMm: reinforcement.stirrup.diameterMm,
+            spacingMm: reinforcement.stirrup.spacingMm,
+            coverMm: reinforcement.stirrup.coverMm,
+            concreteClass: CENTURA_CONCRETE_CLASS,
+          },
+        ],
+      })
+    }
   }
 
   private async provisionDefaultWallAssembly(wallId: string, isExterior: boolean) {

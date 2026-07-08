@@ -218,6 +218,7 @@ model House {
   openings    Opening[]
   foundations Foundation[]
   tieColumns  TieColumn[]
+  centuri     Centura[]
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -280,6 +281,7 @@ model Wall {
 
   assemblyLayers     AssemblyLayer[]
   reinforcementSpecs ReinforcementSpec[]
+  centuri            Centura[]
 
   @@index([houseId])
 }
@@ -455,6 +457,34 @@ model Lintel {
   @@index([materialId])
 }
 
+// A reinforced-concrete ring beam (centură) tying a load-bearing wall's
+// tie-columns together horizontally at one floor level — see
+// packages/bim-engine centura.ts. Tied to the specific Wall whose footprint
+// it follows (unlike TieColumn, a centură has real length/direction, not
+// just a point) — `level` distinguishes the wall's own floor from the extra
+// "above the top floor" centură this module always generates, so a wall on
+// the topmost floor can have two Centura rows.
+model Centura {
+  id            String @id @default(cuid())
+  houseId       String
+  wallId        String
+  level         Int
+  heightMm      Float
+  widthMm       Float
+  concreteClass String
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  wall  Wall  @relation(fields: [wallId], references: [id], onDelete: Cascade)
+
+  reinforcementSpecs ReinforcementSpec[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([houseId])
+  @@index([wallId])
+}
+
 model AssemblyLayer {
   id           String        @id @default(cuid())
   wallId       String?
@@ -480,6 +510,7 @@ model ReinforcementSpec {
   wallId        String?
   foundationId  String?
   tieColumnId   String?
+  centuraId     String?
   role          RebarRole
   barDiameterMm Float
   /// Center-to-center spacing for a repeating bar pattern (wall/footing mats, stirrups along a run). Not meaningful for a fixed-count arrangement — see barCount.
@@ -492,12 +523,14 @@ model ReinforcementSpec {
   wall       Wall?       @relation(fields: [wallId], references: [id], onDelete: Cascade)
   foundation Foundation? @relation(fields: [foundationId], references: [id], onDelete: Cascade)
   tieColumn  TieColumn?  @relation(fields: [tieColumnId], references: [id], onDelete: Cascade)
+  centura    Centura?    @relation(fields: [centuraId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([wallId])
   @@index([foundationId])
   @@index([tieColumnId])
+  @@index([centuraId])
 }
 
 // =====================

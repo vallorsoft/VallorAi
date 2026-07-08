@@ -356,13 +356,14 @@ enum RebarRole {
 
 // S1 = corner/wall-intersection tie-column (always required).
 // S2 = intermediate tie-column limiting max spacing along a run.
-// S3 (tie-column flanking a sufficiently large opening in a sufficiently
-// high seismic zone) is NOT modeled yet — see packages/bim-engine
-// confined-masonry.ts's module doc comment for why (no cited
-// ag-by-locality table in this project yet).
+// S3 = tie-column flanking an opening large enough to require confinement
+// in the site's seismic zone (CR6-2013: area >= 1.5 m² where ag >= 0.25g,
+// >= 2.5 m² elsewhere) — see packages/bim-engine confined-masonry.ts +
+// seismic.ts. Its residual-pier-length trigger remains a documented gap.
 enum TieColumnCategory {
   S1
   S2
+  S3
 }
 
 model Material {

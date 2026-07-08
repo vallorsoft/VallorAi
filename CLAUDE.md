@@ -249,9 +249,10 @@ technical-press summaries of it), not from `docs/materials/`.
   **S1** (every corner/T/X wall-intersection, always required), **S2** (intermediate columns
   limiting spacing to ≤4–5m along a run), and **S3** (columns flanking an opening, but only
   *conditionally*: high-seismicity zones ag≥0.25g + openings ≥1.5m², or lower zones + openings
-  ≥2.5m², or when residual masonry pier-length minimums aren't met). This project has no cited
-  peak-ground-acceleration-by-locality table, so **only S1 and S2 are implemented**; S3 is a
-  documented gap, not a guess. A plain opening jamb correctly gets **no** column — instead,
+  ≥2.5m², or when residual masonry pier-length minimums aren't met). **S1, S2 and now S3 (the
+  area+ag branch) are implemented** — see the "Module 2b" entry below for the S3 addition. Only
+  the residual-pier-length trigger of S3 remains a documented gap (no confirmed primary-source
+  threshold). A plain below-threshold opening jamb correctly gets **no** column — instead,
   every opening gets a **lintel (buiandrug)**, which is the actual, always-required tying-
   together element over an opening (separately confirmed as standard/effectively-mandatory
   practice, prefabricated by default).
@@ -291,14 +292,46 @@ technical-press summaries of it), not from `docs/materials/`.
     reasoning above). `MaterialCategory` gained `PRECAST`. Seeded `Beton C12/15` and
     `Buiandrug prefabricat` (Porotherm A12 citation) `GENERIC_DEFAULT` materials.
   - `HousesService.getTieColumns(houseId)` (`GET /houses/:id/tie-columns`) auto-provisions S1+S2
-    placements (computed per floor) + their reinforcement, idempotent like `getFoundation`.
-    `HousesService.getLintel(openingId)` (`GET /houses/openings/:id/lintel`) auto-provisions one
-    `Lintel` per opening, idempotent. Covered by `apps/api/test/confined-masonry.e2e-spec.ts`
-    (corner placement, mid-span spacing, **no column beside a plain opening** — the corrected
-    behavior — lintel bearing/dimensions, idempotency of both).
+    (+S3, see Module 2b) placements (computed per floor) + their reinforcement, idempotent like
+    `getFoundation`. `HousesService.getLintel(openingId)` (`GET /houses/openings/:id/lintel`)
+    auto-provisions one `Lintel` per opening, idempotent. Covered by
+    `apps/api/test/confined-masonry.e2e-spec.ts` (corner placement, mid-span spacing,
+    **no column beside a plain below-threshold opening** — the corrected behavior — S3 jamb
+    placement, lintel bearing/dimensions, idempotency of both).
   - Not yet done: no UI panel; no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer
     geometry (tie-columns would need their own instanced-box + bent-stirrup-loop rendering,
     related to but not the same gap as the pre-existing Step 9 wall-stirrup gap).
+
+- **Module 2b — S3 tie-columns (opening-triggered) + seismic ag lookup, CR6-2013 / P100-1/2013**.
+  Fills the S3 gap the Module 2 entry documented. **Citation-confidence note**: the two opening-
+  area thresholds (1.5m² for ag≥0.25g, 2.5m² below) and the ag=0.25g boundary were cross-checked
+  across two independently-phrased searches converging on identical values; official PDF hosts
+  (encipedia, kapal.ro, icase.ro, MDLPA) all returned HTTP 403 in this environment, same
+  systematic block Module 3 hit — so this is secondary-corroborated, not primary-quoted. An
+  engineer must confirm against an official CR6-2013 / P100-1/2013 copy.
+  - `packages/bim-engine/src/seismic.ts` (unit-tested) — `resolveSeismicAg(locality)` returns the
+    P100-1/2013 design ground acceleration ag for a locality, mirroring `foundation.ts`'s
+    `resolveFrostDepthMm` exactly: a small `AG_BY_LOCALITY` map of only cross-checked cited values
+    (București 0.30g, Iași 0.25g, Focșani/Vrancea 0.40g national max, Cluj 0.10g national min),
+    and a conservative `FALLBACK_AG_G` (= the 0.25g high-seismicity threshold, `verified:false`)
+    for any unmatched locality so the *stricter* S3 rule applies when the site ag is unknown —
+    over-provisioning, never under-provisioning (consistent with every other "default toward more
+    structure" choice). The full by-locality table is deliberately NOT invented (Key rule 7).
+  - `confined-masonry.ts` gained `TieColumnCategory` value `'S3'`, `WallOpeningForConfinement`,
+    `openingConfinementThresholdSqm(agG)`, `detectOpeningTieColumns(walls, openings, agG)` (a
+    column at each jamb of an over-threshold opening on a load-bearing wall), and
+    `deriveTieColumnPlacements` now takes optional `openings`+`agG` and merges S3 in, deduped
+    against S1/S2 (a jamb coinciding with a corner isn't doubled). Passing no openings reproduces
+    the prior S1+S2 result byte-for-byte (regression-tested). S3 columns reuse the same
+    conservative `deriveTieColumnReinforcement` (4×Ø14) — reinforcement is unchanged.
+  - `TieColumnCategory` enum gained `S3` (migration `add_s3_tie_column_category`, an
+    `ALTER TYPE … ADD VALUE`). `HousesService.getTieColumns` now loads the house's openings +
+    the project's `Plot.county`/`city` and threads `resolveSeismicAg(locality).agG` into
+    provisioning (per floor, openings matched to their host wall's floor). Covered by two new
+    `confined-masonry.e2e-spec.ts` cases (large opening → 2 S3 jambs in the default high zone; a
+    2.0m² opening → **no** S3 in Cluj/0.10g, exercising the ag lookup).
+  - Not yet done: the residual-pier-length S3 trigger (no confirmed threshold — still a gap); no
+    UI panel / cost BOQ line / 3D geometry for S3 (same as S1/S2).
 
 - **Module 3 — Centuri (ring beams)**. **Citation-confidence note**: before starting this
   module, a dedicated research pass specifically tried OFFICIAL sources (ASRO, MDLPA,
@@ -350,11 +383,11 @@ technical-press summaries of it), not from `docs/materials/`.
 
 ### Next (not started, planned in order)
 
-- **S3 tie-columns** (opening-triggered) — needs a cited peak-ground-acceleration-by-locality
-  (ag) table (STAS-6054-77-style research, but for P100-1/2013 seismic zonation) and validated
-  minimum-pier-length thresholds; both are documented gaps in Module 2, not implemented. The
-  Module 3 research pass found individual cited points (București ag=0.30g, Iași ag=0.25g) but
-  not a usable full by-locality table — still an open gap.
+- **S3 tie-columns — area+ag branch DONE (Module 2b above)**. Remaining open: (a) a fuller
+  cited peak-ground-acceleration-by-locality (ag) table — Module 2b seeds only 4 cross-checked
+  cities (`AG_BY_LOCALITY`) and falls back conservatively for the rest, so more cited localities
+  would sharpen it without changing behavior; (b) the residual minimum-pier-length trigger (the
+  second S3 condition), still with no confirmed primary-source threshold.
 - **Module 4 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
   non-confined-masonry (frame) house type exists; the project is masonry-only today.
 - Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing/

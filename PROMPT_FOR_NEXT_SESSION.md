@@ -6,8 +6,9 @@
 > everything mentioned here lives in `CLAUDE.md` — this file is the short "what's next" pointer,
 > not a duplicate of it.
 
-**Branch**: `claude/step-7-complete-build-la97k7` (PRs target `main`)
-**Last commit as of writing**: `bc3257e` — "feat: Romanian building-code law module 3 — centuri / ring beams (CR6-2013)"
+**Branch**: `claude/main-branch-work-mpp95w` (PRs target `main`)
+**Last landed work**: Module 2b — S3 tie-columns (opening-triggered) + P100-1/2013 seismic ag
+lookup (`packages/bim-engine/src/seismic.ts`). See `CLAUDE.md` → "Module 2b".
 
 ## Where things stand
 
@@ -37,10 +38,11 @@ controller route → e2e test → `CLAUDE.md` update → commit.
 ### 1. Finish the open law-module gaps
 These are explicitly documented in `CLAUDE.md` as gaps, not guesses — don't fill them with
 invented numbers, do a real research pass first (see "Research method" below):
-- **S3 tie-columns** (opening-triggered stâlpișori) — needs a cited peak-ground-acceleration
-  (ag) table by locality/județ for P100-1/2013, plus validated minimum masonry-pier-length
-  thresholds. We have isolated points (București ag=0.30g, Iași ag=0.25g) but no usable
-  by-locality table yet.
+- **S3 tie-columns** — the area+ag branch is now DONE (Module 2b: `seismic.ts` ag lookup +
+  `detectOpeningTieColumns`). Still open: (a) a fuller cited ag-by-locality table (only 4
+  cross-checked cities seeded, rest fall back conservatively — more cited localities sharpen it
+  without behavior change); (b) the residual minimum masonry-pier-length trigger (second S3
+  condition), still no confirmed primary-source threshold.
 - **Concrete cover table** (NE 012/1-2022 Annex J) for elements beyond the footing/tie-column/
   centură cases already done — walls, slabs. We confirmed the table *lives* in Annex J but
   couldn't retrieve the actual mm values (official PDF hosts are blocked — see below).

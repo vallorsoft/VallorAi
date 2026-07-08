@@ -1,11 +1,14 @@
 import {
   detectCornerAndIntersectionPoints,
   detectMidSpanTieColumns,
+  detectOpeningTieColumns,
   deriveTieColumnPlacements,
   deriveTieColumnReinforcement,
   deriveLintelSpec,
+  openingConfinementThresholdSqm,
   MAX_TIE_COLUMN_SPACING_M,
   type WallSegment,
+  type WallOpeningForConfinement,
 } from './confined-masonry'
 
 function wall(
@@ -149,6 +152,102 @@ describe('confined-masonry — law module 2 (CR6-2013 stâlpișori + buiandrug)'
       expect(s2.some((p) => p.x === 6 && p.y === 0)).toBe(true)
       expect(s2.some((p) => p.x === 3 && p.y === 3)).toBe(true)
       expect(s2.some((p) => p.x === 6 && p.y === 3)).toBe(true)
+    })
+
+    it('adds S3 columns at both jambs of a large opening, in a high-seismic zone', () => {
+      // One 6m load-bearing wall, no corners; a 2.0x1.5m = 3.0 m² window
+      // starting 2m from the wall's start. In a red zone (ag=0.30g) the
+      // threshold is 1.5 m², so this opening is confined at both jambs.
+      const walls = [wall('n', 0, 0, 6, 0)]
+      const openings: WallOpeningForConfinement[] = [
+        { wallId: 'n', position: 2, width: 2, areaSqm: 3.0 },
+      ]
+      const placements = deriveTieColumnPlacements(walls, openings, 0.3)
+      const s3 = placements.filter((p) => p.category === 'S3')
+      expect(s3).toHaveLength(2)
+      expect(s3.some((p) => p.x === 2 && p.y === 0)).toBe(true) // near jamb
+      expect(s3.some((p) => p.x === 4 && p.y === 0)).toBe(true) // far jamb (2 + 2)
+    })
+
+    it('places no S3 column for a below-threshold opening', () => {
+      // Same wall, a small 1.2x1.2 = 1.44 m² window — under the 1.5 m²
+      // red-zone threshold, so no confinement column.
+      const walls = [wall('n', 0, 0, 6, 0)]
+      const openings: WallOpeningForConfinement[] = [
+        { wallId: 'n', position: 2, width: 1.2, areaSqm: 1.44 },
+      ]
+      const placements = deriveTieColumnPlacements(walls, openings, 0.3)
+      expect(placements.filter((p) => p.category === 'S3')).toHaveLength(0)
+    })
+
+    it('applies the looser 2.5 m² threshold in a low-seismic zone', () => {
+      // A 2.0 m² opening: confined at ag=0.30g (>=1.5), NOT at ag=0.10g
+      // (<2.5).
+      const walls = [wall('n', 0, 0, 6, 0)]
+      const openings: WallOpeningForConfinement[] = [
+        { wallId: 'n', position: 2, width: 1.6, areaSqm: 2.0 },
+      ]
+      expect(
+        deriveTieColumnPlacements(walls, openings, 0.3).filter((p) => p.category === 'S3'),
+      ).toHaveLength(2)
+      expect(
+        deriveTieColumnPlacements(walls, openings, 0.1).filter((p) => p.category === 'S3'),
+      ).toHaveLength(0)
+    })
+
+    it('does not double-place an S3 jamb that coincides with an S1 corner', () => {
+      // A 4m wall meeting another at the origin (a corner -> S1 at 0,0),
+      // with a large opening whose near jamb sits exactly at that corner.
+      const walls = [wall('n', 0, 0, 4, 0), wall('w', 0, 0, 0, 4)]
+      const openings: WallOpeningForConfinement[] = [
+        { wallId: 'n', position: 0, width: 2, areaSqm: 3.0 },
+      ]
+      const placements = deriveTieColumnPlacements(walls, openings, 0.3)
+      const atOrigin = placements.filter((p) => p.x === 0 && p.y === 0)
+      expect(atOrigin).toHaveLength(1)
+      expect(atOrigin[0].category).toBe('S1')
+      // The far jamb (2,0) is still an S3 column.
+      expect(placements.some((p) => p.category === 'S3' && p.x === 2 && p.y === 0)).toBe(true)
+    })
+
+    it('ignores openings on non-load-bearing walls', () => {
+      const walls = [wall('partition', 0, 0, 6, 0, false)]
+      const openings: WallOpeningForConfinement[] = [
+        { wallId: 'partition', position: 2, width: 2, areaSqm: 3.0 },
+      ]
+      expect(deriveTieColumnPlacements(walls, openings, 0.3)).toHaveLength(0)
+    })
+
+    it('reproduces the S1+S2-only result when no openings are passed', () => {
+      const walls = [
+        wall('n', 0, 0, 9, 0),
+        wall('e', 9, 0, 9, 3),
+        wall('s', 9, 3, 0, 3),
+        wall('w', 0, 3, 0, 0),
+      ]
+      expect(deriveTieColumnPlacements(walls)).toEqual(deriveTieColumnPlacements(walls, [], 0.3))
+    })
+  })
+
+  describe('detectOpeningTieColumns / openingConfinementThresholdSqm', () => {
+    it('uses 1.5 m² at/above 0.25g and 2.5 m² below', () => {
+      expect(openingConfinementThresholdSqm(0.25)).toBe(1.5)
+      expect(openingConfinementThresholdSqm(0.3)).toBe(1.5)
+      expect(openingConfinementThresholdSqm(0.2)).toBe(2.5)
+      expect(openingConfinementThresholdSqm(0.1)).toBe(2.5)
+    })
+
+    it('computes jamb points along a diagonal wall correctly', () => {
+      // Wall from (0,0) to (0,10): a vertical wall. Opening near jamb at 3m,
+      // width 2m -> jambs at (0,3) and (0,5).
+      const walls = [wall('v', 0, 0, 0, 10)]
+      const openings: WallOpeningForConfinement[] = [
+        { wallId: 'v', position: 3, width: 2, areaSqm: 3.0 },
+      ]
+      const points = detectOpeningTieColumns(walls, openings, 0.3)
+      expect(points).toHaveLength(2)
+      expect(points).toContainEqual({ x: 0, y: 3 })
+      expect(points).toContainEqual({ x: 0, y: 5 })
     })
   })
 

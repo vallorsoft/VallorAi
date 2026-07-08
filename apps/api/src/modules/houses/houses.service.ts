@@ -3,6 +3,7 @@ import { prisma } from '@ai-home-designer/database'
 import {
   deriveFoundationSpec,
   resolveFrostDepthMm,
+  resolveSeismicAg,
   deriveTieColumnPlacements,
   deriveTieColumnReinforcement,
   deriveLintelSpec,
@@ -12,6 +13,7 @@ import {
   TIE_COLUMN_CROSS_SECTION_MM,
   TIE_COLUMN_CONCRETE_CLASS,
   type WallSegment,
+  type WallOpeningForConfinement,
   type CenturaWallSegment,
 } from '@ai-home-designer/bim-engine'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
@@ -245,17 +247,23 @@ export class HousesService {
 
   /**
    * The house's confined-masonry tie-columns (stâlpișori), auto-provisioning
-   * S1 (corner/intersection) and S2 (max-spacing) placements on first
-   * access, idempotent like getFoundation. S3 (columns flanking a large
-   * opening in a high-seismic zone) is deliberately not generated — see
-   * packages/bim-engine confined-masonry.ts's module doc comment; a plain
-   * opening jamb correctly gets no column from this method.
+   * S1 (corner/intersection), S2 (max-spacing) and S3 (opening-flanking)
+   * placements on first access, idempotent like getFoundation. S3 columns
+   * are generated only for openings large enough to require confinement in
+   * the site's seismic zone (CR6-2013: >= 1.5 m² where ag >= 0.25g, >= 2.5 m²
+   * elsewhere) — the site ag comes from the project's Plot locality via
+   * seismic.ts (P100-1/2013), defaulting conservatively (stricter threshold)
+   * for an unknown locality. A below-threshold opening gets no column.
    */
   async getTieColumns(houseId: string) {
     const existing = await prisma.tieColumn.findFirst({ where: { houseId } })
     if (!existing) {
-      const house = await prisma.house.findUniqueOrThrow({ where: { id: houseId }, include: { walls: true } })
-      await this.provisionTieColumns(house)
+      const house = await prisma.house.findUniqueOrThrow({
+        where: { id: houseId },
+        include: { walls: true, openings: true, project: { include: { plot: true } } },
+      })
+      const locality = house.project.plot?.county ?? house.project.plot?.city ?? null
+      await this.provisionTieColumns(house, resolveSeismicAg(locality).agG)
     }
     return prisma.tieColumn.findMany({
       where: { houseId },
@@ -264,21 +272,27 @@ export class HousesService {
     })
   }
 
-  private async provisionTieColumns(house: {
-    id: string
-    walls: {
+  private async provisionTieColumns(
+    house: {
       id: string
-      startX: number
-      startY: number
-      endX: number
-      endY: number
-      floor: number
-      isExterior: boolean
-      isLoad: boolean
-    }[]
-  }) {
+      walls: {
+        id: string
+        startX: number
+        startY: number
+        endX: number
+        endY: number
+        floor: number
+        isExterior: boolean
+        isLoad: boolean
+      }[]
+      openings: { wallId: string; position: number; width: number; height: number }[]
+    },
+    agG: number,
+  ) {
     const reinforcement = deriveTieColumnReinforcement()
     const floors = new Set(house.walls.map((w) => w.floor))
+    // Which floor each opening sits on is its host wall's floor.
+    const wallFloor = new Map(house.walls.map((w) => [w.id, w.floor]))
 
     for (const floor of floors) {
       const segments: WallSegment[] = house.walls
@@ -291,7 +305,15 @@ export class HousesService {
           endY: w.endY,
           isLoadBearing: w.isExterior || w.isLoad,
         }))
-      const placements = deriveTieColumnPlacements(segments)
+      const openings: WallOpeningForConfinement[] = house.openings
+        .filter((o) => wallFloor.get(o.wallId) === floor)
+        .map((o) => ({
+          wallId: o.wallId,
+          position: o.position,
+          width: o.width,
+          areaSqm: o.width * o.height,
+        }))
+      const placements = deriveTieColumnPlacements(segments, openings, agG)
 
       for (const placement of placements) {
         const tieColumn = await prisma.tieColumn.create({

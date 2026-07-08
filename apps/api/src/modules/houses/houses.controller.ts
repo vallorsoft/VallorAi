@@ -61,8 +61,43 @@ export class HousesController {
     return this.housesService.updateWall(wallId, body, req.user.id)
   }
 
+  @Post(':id/openings')
+  addOpening(
+    @Param('id') houseId: string,
+    @Body() body: { wallId: string } & Record<string, unknown>,
+    @Request() req: { user: { id: string } },
+  ) {
+    const { wallId, ...data } = body
+    return this.housesService.addOpening(houseId, wallId, data as never, req.user.id)
+  }
+
   @Get('walls/:id/layers')
   getWallLayers(@Param('id') wallId: string) {
     return this.housesService.getWallLayers(wallId)
+  }
+
+  @Get('walls/:id/reinforcement')
+  getWallReinforcement(@Param('id') wallId: string) {
+    return this.housesService.getWallReinforcement(wallId)
+  }
+
+  @Get(':id/foundation')
+  getFoundation(@Param('id') houseId: string) {
+    return this.housesService.getFoundation(houseId)
+  }
+
+  @Get(':id/tie-columns')
+  getTieColumns(@Param('id') houseId: string) {
+    return this.housesService.getTieColumns(houseId)
+  }
+
+  @Get('openings/:id/lintel')
+  getLintel(@Param('id') openingId: string) {
+    return this.housesService.getLintel(openingId)
+  }
+
+  @Get(':id/centuri')
+  getCenturi(@Param('id') houseId: string) {
+    return this.housesService.getCenturi(houseId)
   }
 }

@@ -73,6 +73,20 @@ export function useWallLayers(wallId: string | null) {
   })
 }
 
+export interface WallReinforcementSpec {
+  id: string
+  role: 'LONGITUDINAL' | 'STIRRUP'
+  barDiameterMm: number
+  spacingMm: number
+  coverMm: number
+  concreteClass: string
+}
+
+export async function fetchWallReinforcement(wallId: string): Promise<WallReinforcementSpec[]> {
+  const res = await api.get(`/houses/walls/${wallId}/reinforcement`)
+  return res.data as WallReinforcementSpec[]
+}
+
 export function useConversation(projectId: string) {
   return useQuery({
     queryKey: ['conversation', projectId],

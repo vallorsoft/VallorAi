@@ -115,6 +115,7 @@ export const en = {
       lodLabel: 'Level of detail',
       masonryComputing: 'Generating masonry…',
       brickCountLabel: 'Bricks',
+      rebarCountLabel: 'Rebar bars',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Hardware acceleration unavailable — masonry detail is disabled to keep the view smooth',
     },

@@ -32,6 +32,7 @@ describe('Cost engine BOQ integration (e2e)', () => {
   let server: ReturnType<NestFastifyApplication['getHttpServer']>
   let accessToken: string
   let houseId: string
+  let wallId: string
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -67,11 +68,12 @@ describe('Cost engine BOQ integration (e2e)', () => {
     houseId = houseRes.body.data.id
 
     // A 10m x 2.5m exterior wall -> 25 m² of exterior assembly.
-    await request(server)
+    const wallRes = await request(server)
       .post(`/api/v1/houses/${houseId}/walls`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ startX: 0, startY: 0, endX: 10, endY: 0, floor: 0, height: 2.5, isExterior: true })
       .expect(201)
+    wallId = wallRes.body.data.id
   })
 
   afterAll(async () => {
@@ -108,5 +110,29 @@ describe('Cost engine BOQ integration (e2e)', () => {
     expect(renderLine!.quantity).toBeCloseTo(25, 5) // m² default for an M2-unit material
 
     expect(res.body.data.total).toBeGreaterThan(0)
+  })
+
+  it('subtracts door/window openings from the wall BOQ (net area)', async () => {
+    // A 1.5m × 1.2m window -> 1.8 m² subtracted from the 25 m² wall.
+    await request(server)
+      .post(`/api/v1/houses/${houseId}/openings`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ wallId, type: 'WINDOW', position: 4, width: 1.5, height: 1.2, sillHeight: 0.9 })
+      .expect(201)
+
+    const res = await request(server)
+      .post(`/api/v1/costs/houses/${houseId}/estimate`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201)
+
+    const breakdown: Array<{ category: string; name: string; quantity: number }> =
+      res.body.data.breakdown
+
+    const structuralLine = breakdown.find((l) => l.category === 'wall-structural')
+    // 23.2 m² net * 16 pcs/m² (Leier N+F piecesPerM2) = 371.2 pieces.
+    expect(structuralLine!.quantity).toBeCloseTo((25 - 1.8) * 16, 5)
+
+    const renderLine = breakdown.find((l) => l.category === 'wall-render')
+    expect(renderLine!.quantity).toBeCloseTo(25 - 1.8, 5)
   })
 })

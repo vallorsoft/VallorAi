@@ -115,6 +115,7 @@ export const ro = {
       lodLabel: 'Nivel de detaliu',
       masonryComputing: 'Se generează zidăria…',
       brickCountLabel: 'Cărămizi',
+      rebarCountLabel: 'Bare de armătură',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Accelerare hardware indisponibilă — detaliile de zidărie sunt dezactivate pentru fluiditate',
     },

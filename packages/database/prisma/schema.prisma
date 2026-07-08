@@ -217,6 +217,8 @@ model House {
   walls       Wall[]
   openings    Opening[]
   foundations Foundation[]
+  tieColumns  TieColumn[]
+  centuri     Centura[]
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -279,6 +281,7 @@ model Wall {
 
   assemblyLayers     AssemblyLayer[]
   reinforcementSpecs ReinforcementSpec[]
+  centuri            Centura[]
 
   @@index([houseId])
 }
@@ -296,6 +299,7 @@ model Opening {
 
   house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
   wall  Wall  @relation(fields: [wallId], references: [id], onDelete: Cascade)
+  lintel Lintel?
 
   @@index([houseId])
   @@index([wallId])
@@ -320,6 +324,7 @@ enum MaterialCategory {
   RENDER
   PLASTER
   PAINT
+  PRECAST
 }
 
 enum MaterialUnit {
@@ -346,6 +351,18 @@ enum LayerFunction {
 enum RebarRole {
   LONGITUDINAL
   STIRRUP
+  TRANSVERSE
+}
+
+// S1 = corner/wall-intersection tie-column (always required).
+// S2 = intermediate tie-column limiting max spacing along a run.
+// S3 (tie-column flanking a sufficiently large opening in a sufficiently
+// high seismic zone) is NOT modeled yet — see packages/bim-engine
+// confined-masonry.ts's module doc comment for why (no cited
+// ag-by-locality table in this project yet).
+enum TieColumnCategory {
+  S1
+  S2
 }
 
 model Material {
@@ -361,6 +378,7 @@ model Material {
   priceUpdatedAt DateTime         @default(now())
 
   assemblyLayers AssemblyLayer[]
+  lintels        Lintel[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -387,6 +405,86 @@ model Foundation {
   @@index([houseId])
 }
 
+// A reinforced-concrete tie-column (stâlpișor) embedded in a masonry wall
+// run, per CR6-2013 — see packages/bim-engine confined-masonry.ts for the
+// S1 (corner/intersection) and S2 (max-spacing) placement rules. Owned
+// directly by House (not a specific Wall) because a corner/intersection
+// column is naturally shared between the two-or-more walls that meet
+// there — posX/posY/floor place it in the same plan coordinates as Wall/
+// Room.
+model TieColumn {
+  id             String            @id @default(cuid())
+  houseId        String
+  floor          Int               @default(0)
+  posX           Float
+  posY           Float
+  category       TieColumnCategory
+  crossSectionMm Float
+  concreteClass  String
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  reinforcementSpecs ReinforcementSpec[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([houseId])
+}
+
+// A lintel (buiandrug) spanning one door/window Opening, bearing into the
+// wall on each side — see packages/bim-engine confined-masonry.ts.
+// Reinforcement is deliberately not modeled here: a prefabricated lintel's
+// reinforcement is internal to the manufactured unit (referenced via
+// `material`, not computed), and this project has no cited primary source
+// for monolithic cast-in-place lintel reinforcement yet (see CLAUDE.md gap
+// note) — not guessed.
+model Lintel {
+  id              String  @id @default(cuid())
+  openingId       String  @unique
+  materialId      String
+  lengthMm        Float
+  widthMm         Float
+  bearingLengthMm Float
+  prefabricated   Boolean @default(true)
+
+  opening  Opening  @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([materialId])
+}
+
+// A reinforced-concrete ring beam (centură) tying a load-bearing wall's
+// tie-columns together horizontally at one floor level — see
+// packages/bim-engine centura.ts. Tied to the specific Wall whose footprint
+// it follows (unlike TieColumn, a centură has real length/direction, not
+// just a point) — `level` distinguishes the wall's own floor from the extra
+// "above the top floor" centură this module always generates, so a wall on
+// the topmost floor can have two Centura rows.
+model Centura {
+  id            String @id @default(cuid())
+  houseId       String
+  wallId        String
+  level         Int
+  heightMm      Float
+  widthMm       Float
+  concreteClass String
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  wall  Wall  @relation(fields: [wallId], references: [id], onDelete: Cascade)
+
+  reinforcementSpecs ReinforcementSpec[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([houseId])
+  @@index([wallId])
+}
+
 model AssemblyLayer {
   id           String        @id @default(cuid())
   wallId       String?
@@ -411,19 +509,28 @@ model ReinforcementSpec {
   id            String    @id @default(cuid())
   wallId        String?
   foundationId  String?
+  tieColumnId   String?
+  centuraId     String?
   role          RebarRole
   barDiameterMm Float
+  /// Center-to-center spacing for a repeating bar pattern (wall/footing mats, stirrups along a run). Not meaningful for a fixed-count arrangement — see barCount.
   spacingMm     Float
+  /// Fixed bar count for an element whose reinforcement isn't a spacing-derived repeat — e.g. a tie-column's 4 corner bars. Null where spacingMm (+element geometry) already implies the count.
+  barCount      Int?
   coverMm       Float
   concreteClass String
 
   wall       Wall?       @relation(fields: [wallId], references: [id], onDelete: Cascade)
   foundation Foundation? @relation(fields: [foundationId], references: [id], onDelete: Cascade)
+  tieColumn  TieColumn?  @relation(fields: [tieColumnId], references: [id], onDelete: Cascade)
+  centura    Centura?    @relation(fields: [centuraId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([wallId])
   @@index([foundationId])
+  @@index([tieColumnId])
+  @@index([centuraId])
 }
 
 // =====================

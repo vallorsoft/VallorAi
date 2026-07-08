@@ -6,9 +6,17 @@ import type { BrickModule } from '@ai-home-designer/bim-engine'
  * importing the worker entry file itself.
  */
 
+/** A door/window rectangle on the wall, wall-local, meters (see store Opening). */
+export interface BrickWorkerOpening {
+  position: number
+  width: number
+  height: number
+  sillHeight: number
+}
+
 export interface BrickWorkerWallJob {
   wallId: string
-  /** Cache key computed on the main thread (wall geometry + layer spec hash). */
+  /** Cache key computed on the main thread (wall geometry + opening + layer spec hash). */
   cacheKey: string
   /** Wall placement in the house's local coordinates, meters (scene units). */
   startX: number
@@ -18,6 +26,7 @@ export interface BrickWorkerWallJob {
   heightM: number
   thicknessM: number
   brick: BrickModule
+  openings: BrickWorkerOpening[]
 }
 
 export interface BrickWorkerRequest {

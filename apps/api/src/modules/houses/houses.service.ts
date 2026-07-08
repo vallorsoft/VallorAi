@@ -1,5 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
+import {
+  deriveFoundationSpec,
+  resolveFrostDepthMm,
+  deriveTieColumnPlacements,
+  deriveTieColumnReinforcement,
+  deriveLintelSpec,
+  deriveCenturaLevels,
+  deriveCenturaReinforcement,
+  CENTURA_CONCRETE_CLASS,
+  TIE_COLUMN_CROSS_SECTION_MM,
+  TIE_COLUMN_CONCRETE_CLASS,
+  type WallSegment,
+  type CenturaWallSegment,
+} from '@ai-home-designer/bim-engine'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
 @Injectable()
@@ -105,6 +119,334 @@ export class HousesService {
       include: { material: true },
       orderBy: { order: 'asc' },
     })
+  }
+
+  /**
+   * A wall's reinforcement specs (LONGITUDINAL / STIRRUP rebar). Unlike
+   * getWallLayers there is NO auto-provisioning here: plain masonry walls
+   * carry no reinforcement, and inventing a structural rebar default would
+   * violate Key rule 7 (every value must trace to a real source). Rows exist
+   * only where reinforcement was actually specified for the element.
+   */
+  async getWallReinforcement(wallId: string) {
+    return prisma.reinforcementSpec.findMany({
+      where: { wallId },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
+
+  /**
+   * The house's constructive-minimum strip-footing spec (concrete +
+   * reinforcement), auto-provisioning a Foundation row on first access if
+   * none exists yet — unlike getWallReinforcement, every house needs SOME
+   * foundation, so a real, standards-cited default (STAS 6054-77 frost
+   * depth + NP 112-2014 constructive minimums, see bim-engine
+   * foundation.ts) is legitimate here, the same way getWallLayers
+   * auto-provisions a wall assembly.
+   *
+   * `depthVerified` is recomputed from the *current* Plot locality on every
+   * call rather than persisted: it reflects whether today's site address
+   * matches a cited STAS 6054-77 locality, which can only get more accurate
+   * as the user fills in the plot address — persisting a stale flag from
+   * provision time would understate that.
+   */
+  async getFoundation(houseId: string) {
+    const include = {
+      assemblyLayers: { include: { material: true }, orderBy: { order: 'asc' as const } },
+      reinforcementSpecs: true,
+    }
+    let foundation = await prisma.foundation.findFirst({ where: { houseId }, include })
+
+    const house = await prisma.house.findUniqueOrThrow({
+      where: { id: houseId },
+      include: { walls: true, project: { include: { plot: true } } },
+    })
+
+    if (!foundation) {
+      await this.provisionDefaultFoundation(house)
+      foundation = await prisma.foundation.findFirstOrThrow({ where: { houseId }, include })
+    }
+
+    const locality = house.project.plot?.county ?? house.project.plot?.city ?? null
+    return { ...foundation, depthVerified: resolveFrostDepthMm(locality).verified }
+  }
+
+  private async provisionDefaultFoundation(house: {
+    id: string
+    walls: { thickness: number; isExterior: boolean; isLoad: boolean }[]
+    project: { plot: { county: string | null; city: string | null } | null }
+  }) {
+    const loadBearingWalls = house.walls.filter((w) => w.isExterior || w.isLoad)
+    const wallThicknessMm = loadBearingWalls.reduce(
+      (max, w) => Math.max(max, w.thickness * 1000),
+      0,
+    )
+    const locality = house.project.plot?.county ?? house.project.plot?.city ?? null
+    const spec = deriveFoundationSpec(wallThicknessMm, locality)
+
+    const [leanConcrete, structuralConcrete] = await Promise.all([
+      prisma.material.findFirstOrThrow({
+        where: { name: 'Beton de egalizare C8/10', source: 'GENERIC_DEFAULT' },
+      }),
+      prisma.material.findFirstOrThrow({
+        where: { name: 'Beton C16/20', source: 'GENERIC_DEFAULT' },
+      }),
+    ])
+
+    const foundation = await prisma.foundation.create({
+      data: {
+        houseId: house.id,
+        depthMm: spec.depthMm,
+        widthMm: spec.widthMm,
+        concreteClass: spec.concreteClass,
+      },
+    })
+
+    await prisma.assemblyLayer.createMany({
+      data: [
+        {
+          foundationId: foundation.id,
+          order: 1,
+          materialId: leanConcrete.id,
+          thicknessMm: spec.leanConcreteThicknessMm,
+          function: 'STRUCTURAL',
+        },
+        {
+          foundationId: foundation.id,
+          order: 2,
+          materialId: structuralConcrete.id,
+          thicknessMm: spec.depthMm,
+          function: 'STRUCTURAL',
+        },
+      ],
+    })
+
+    await prisma.reinforcementSpec.createMany({
+      data: [
+        {
+          foundationId: foundation.id,
+          role: 'TRANSVERSE',
+          barDiameterMm: spec.reinforcement.transverse.diameterMm,
+          spacingMm: spec.reinforcement.transverse.spacingMm,
+          coverMm: spec.reinforcementCoverMm,
+          concreteClass: spec.concreteClass,
+        },
+        {
+          foundationId: foundation.id,
+          role: 'LONGITUDINAL',
+          barDiameterMm: spec.reinforcement.distribution.diameterMm,
+          spacingMm: spec.reinforcement.distribution.spacingMm,
+          coverMm: spec.reinforcementCoverMm,
+          concreteClass: spec.concreteClass,
+        },
+      ],
+    })
+  }
+
+  /**
+   * The house's confined-masonry tie-columns (stâlpișori), auto-provisioning
+   * S1 (corner/intersection) and S2 (max-spacing) placements on first
+   * access, idempotent like getFoundation. S3 (columns flanking a large
+   * opening in a high-seismic zone) is deliberately not generated — see
+   * packages/bim-engine confined-masonry.ts's module doc comment; a plain
+   * opening jamb correctly gets no column from this method.
+   */
+  async getTieColumns(houseId: string) {
+    const existing = await prisma.tieColumn.findFirst({ where: { houseId } })
+    if (!existing) {
+      const house = await prisma.house.findUniqueOrThrow({ where: { id: houseId }, include: { walls: true } })
+      await this.provisionTieColumns(house)
+    }
+    return prisma.tieColumn.findMany({
+      where: { houseId },
+      include: { reinforcementSpecs: true },
+      orderBy: [{ floor: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  private async provisionTieColumns(house: {
+    id: string
+    walls: {
+      id: string
+      startX: number
+      startY: number
+      endX: number
+      endY: number
+      floor: number
+      isExterior: boolean
+      isLoad: boolean
+    }[]
+  }) {
+    const reinforcement = deriveTieColumnReinforcement()
+    const floors = new Set(house.walls.map((w) => w.floor))
+
+    for (const floor of floors) {
+      const segments: WallSegment[] = house.walls
+        .filter((w) => w.floor === floor)
+        .map((w) => ({
+          id: w.id,
+          startX: w.startX,
+          startY: w.startY,
+          endX: w.endX,
+          endY: w.endY,
+          isLoadBearing: w.isExterior || w.isLoad,
+        }))
+      const placements = deriveTieColumnPlacements(segments)
+
+      for (const placement of placements) {
+        const tieColumn = await prisma.tieColumn.create({
+          data: {
+            houseId: house.id,
+            floor,
+            posX: placement.x,
+            posY: placement.y,
+            category: placement.category,
+            crossSectionMm: TIE_COLUMN_CROSS_SECTION_MM,
+            concreteClass: TIE_COLUMN_CONCRETE_CLASS,
+          },
+        })
+        await prisma.reinforcementSpec.createMany({
+          data: [
+            {
+              tieColumnId: tieColumn.id,
+              role: 'LONGITUDINAL',
+              barDiameterMm: reinforcement.longitudinal.diameterMm,
+              spacingMm: reinforcement.longitudinal.edgeSpacingMm,
+              barCount: reinforcement.longitudinal.barCount,
+              coverMm: reinforcement.longitudinal.coverMm,
+              concreteClass: TIE_COLUMN_CONCRETE_CLASS,
+            },
+            {
+              tieColumnId: tieColumn.id,
+              role: 'STIRRUP',
+              barDiameterMm: reinforcement.stirrup.diameterMm,
+              spacingMm: reinforcement.stirrup.spacingMm,
+              coverMm: reinforcement.stirrup.coverMm,
+              concreteClass: TIE_COLUMN_CONCRETE_CLASS,
+            },
+          ],
+        })
+      }
+    }
+  }
+
+  /**
+   * An opening's lintel (buiandrug), auto-provisioning a prefabricated
+   * default on first access, idempotent. Reinforcement is not modeled — see
+   * packages/bim-engine confined-masonry.ts's module doc comment (a
+   * prefabricated unit's reinforcement is internal to the manufactured
+   * product; monolithic lintel reinforcement has no cited primary source
+   * yet).
+   */
+  async getLintel(openingId: string) {
+    const existing = await prisma.lintel.findUnique({
+      where: { openingId },
+      include: { material: true },
+    })
+    if (existing) return existing
+
+    const opening = await prisma.opening.findUniqueOrThrow({
+      where: { id: openingId },
+      include: { wall: true },
+    })
+    const spec = deriveLintelSpec(opening.width * 1000, opening.wall.thickness * 1000)
+    const material = await prisma.material.findFirstOrThrow({
+      where: { name: 'Buiandrug prefabricat', source: 'GENERIC_DEFAULT' },
+    })
+
+    return prisma.lintel.create({
+      data: {
+        openingId,
+        materialId: material.id,
+        lengthMm: spec.lengthMm,
+        widthMm: spec.widthMm,
+        bearingLengthMm: spec.bearingLengthMm,
+        prefabricated: spec.prefabricated,
+      },
+      include: { material: true },
+    })
+  }
+
+  /**
+   * The house's ring beams (centuri), auto-provisioning one per load-bearing
+   * wall at its own floor level (plus one extra level above the topmost
+   * floor — see confined-masonry doc comment) on first access, idempotent
+   * like getFoundation/getTieColumns.
+   */
+  async getCenturi(houseId: string) {
+    const existing = await prisma.centura.findFirst({ where: { houseId } })
+    if (!existing) {
+      const house = await prisma.house.findUniqueOrThrow({ where: { id: houseId }, include: { walls: true } })
+      await this.provisionCenturi(house)
+    }
+    return prisma.centura.findMany({
+      where: { houseId },
+      include: { reinforcementSpecs: true },
+      orderBy: [{ level: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  private async provisionCenturi(house: {
+    id: string
+    walls: {
+      id: string
+      startX: number
+      startY: number
+      endX: number
+      endY: number
+      floor: number
+      thickness: number
+      isExterior: boolean
+      isLoad: boolean
+    }[]
+  }) {
+    const segments: CenturaWallSegment[] = house.walls.map((w) => ({
+      id: w.id,
+      startX: w.startX,
+      startY: w.startY,
+      endX: w.endX,
+      endY: w.endY,
+      floor: w.floor,
+      thicknessMm: w.thickness * 1000,
+      isLoadBearing: w.isExterior || w.isLoad,
+      isExterior: w.isExterior,
+    }))
+    const placements = deriveCenturaLevels(segments)
+
+    for (const placement of placements) {
+      const reinforcement = deriveCenturaReinforcement(placement.heightMm, placement.widthMm)
+      const centura = await prisma.centura.create({
+        data: {
+          houseId: house.id,
+          wallId: placement.wallId,
+          level: placement.level,
+          heightMm: placement.heightMm,
+          widthMm: placement.widthMm,
+          concreteClass: CENTURA_CONCRETE_CLASS,
+        },
+      })
+      await prisma.reinforcementSpec.createMany({
+        data: [
+          {
+            centuraId: centura.id,
+            role: 'LONGITUDINAL',
+            barDiameterMm: reinforcement.longitudinal.diameterMm,
+            spacingMm: reinforcement.longitudinal.edgeSpacingMm,
+            barCount: reinforcement.longitudinal.barCount,
+            coverMm: reinforcement.longitudinal.coverMm,
+            concreteClass: CENTURA_CONCRETE_CLASS,
+          },
+          {
+            centuraId: centura.id,
+            role: 'STIRRUP',
+            barDiameterMm: reinforcement.stirrup.diameterMm,
+            spacingMm: reinforcement.stirrup.spacingMm,
+            coverMm: reinforcement.stirrup.coverMm,
+            concreteClass: CENTURA_CONCRETE_CLASS,
+          },
+        ],
+      })
+    }
   }
 
   private async provisionDefaultWallAssembly(wallId: string, isExterior: boolean) {

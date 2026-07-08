@@ -9,6 +9,8 @@ import { WallMesh } from './WallMesh'
 import { RoomFloor } from './RoomFloor'
 import { BrickInstances } from './BrickInstances'
 import { useBrickInstances } from './useBrickInstances'
+import { RebarInstances } from './RebarInstances'
+import { useRebarInstances } from './useRebarInstances'
 import { useLOD } from './useLOD'
 
 function houseBounds(house: House) {
@@ -68,6 +70,18 @@ interface HouseSceneProps {
 export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const { t } = useTranslation()
   const { centerX, centerZ } = useMemo(() => houseBounds(house), [house])
+  // Stable per-wall opening arrays — the FPS readout re-renders this scene
+  // twice a second, and an inline filter() would hand every WallMesh a fresh
+  // array each time, defeating its memoization.
+  const openingsByWall = useMemo(() => {
+    const map = new Map<string, NonNullable<House['openings']>>()
+    for (const opening of house.openings ?? []) {
+      const list = map.get(opening.wallId) ?? []
+      list.push(opening)
+      map.set(opening.wallId, list)
+    }
+    return map
+  }, [house])
   const rawTier = useLOD()
   const lodTier = lowPerfMode && rawTier === 'detail' ? 'medium' : rawTier
   const fps = useFps()
@@ -76,6 +90,8 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
     lodTier === 'detail',
   )
   const showBricks = lodTier === 'detail' && !computing && pools.length > 0
+  const rebar = useRebarInstances(house, lodTier === 'detail')
+  const showRebar = lodTier === 'detail' && !rebar.computing && rebar.pools.length > 0
 
   return (
     <group position={[-centerX, 0, -centerZ]}>
@@ -84,9 +100,20 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
       ))}
       {house.walls.map((wall) => {
         const brickInfo = showBricks ? brickWalls.get(wall.id) : undefined
-        return <WallMesh key={wall.id} wall={wall} mortarCoreWidthM={brickInfo?.brickWidthM} />
+        return (
+          <WallMesh
+            key={wall.id}
+            wall={wall}
+            openings={openingsByWall.get(wall.id)}
+            mortarCoreWidthM={brickInfo?.brickWidthM}
+            // Rebar sits inside the element — the abstract box goes
+            // translucent (BIM rebar-view convention) so the bars read.
+            translucent={showRebar && !brickInfo && rebar.rebarWallIds.has(wall.id)}
+          />
+        )
       })}
       {showBricks && pools.map((pool) => <BrickInstances key={pool.key} pool={pool} />)}
+      {showRebar && rebar.pools.map((pool) => <RebarInstances key={pool.key} pool={pool} />)}
       <Html fullscreen>
         <div className="absolute top-3 right-3 rounded-md bg-white/90 px-2.5 py-1 text-xs text-gray-500 shadow-sm pointer-events-none">
           {t.editor.viewer3d.lodLabel}: {lodTier}
@@ -96,6 +123,12 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <>
               {' '}
               · {t.editor.viewer3d.brickCountLabel}: {totalBricks.toLocaleString()}
+            </>
+          )}
+          {showRebar && rebar.totalBars > 0 && (
+            <>
+              {' '}
+              · {t.editor.viewer3d.rebarCountLabel}: {rebar.totalBars.toLocaleString()}
             </>
           )}
           {lowPerfMode && (

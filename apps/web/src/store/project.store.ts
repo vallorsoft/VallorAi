@@ -24,6 +24,22 @@ export interface Wall {
   isExterior: boolean
 }
 
+/**
+ * A door/window hole in a wall. `position` is the distance (m) from the
+ * wall's start point to the opening's near jamb along the wall axis;
+ * `sillHeight` is the opening's bottom above the wall base (0 for doors) —
+ * same convention as bim-engine's WallOpeningMm, in meters.
+ */
+export interface Opening {
+  id: string
+  wallId: string
+  type: string
+  position: number
+  width: number
+  height: number
+  sillHeight: number
+}
+
 export interface House {
   id: string
   floors: number
@@ -31,6 +47,8 @@ export interface House {
   roofType?: string
   rooms: Room[]
   walls: Wall[]
+  /** Present when loaded from the API (`GET /houses/projects/:id` includes openings). */
+  openings?: Opening[]
 }
 
 interface ProjectStore {

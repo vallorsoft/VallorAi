@@ -178,6 +178,200 @@ creating a new singleton table per setting.
 Validated in `apps/api/src/modules/rules/rules.service.ts`.
 Returns `ValidationResult` with `violations[]`, `passedRules[]`, `permitReadiness` (%).
 Permit docs: DTAC, PTh, DDE, PAC, POE.
+This is the **livability/permit** rule set (min room areas, required rooms, corridor width) —
+distinct from the structural "law modules" below, which drive what the system actually builds.
+
+## Romanian structural building-code "law modules" — status
+
+**Goal** (user requirement, explicit direction 2026-07-08): every structural default the system
+builds with — foundation depth/concrete/rebar, confined-masonry tie-columns (`stâlpișori`) and
+ring beams (`centuri`), frame-column reinforcement, concrete cover — must trace to a real,
+cited Romanian standard, the same way Key rule 7 already requires for `Material.specSheet`.
+Rolling out one self-contained module at a time (data model + `bim-engine` pure calc + tests +
+API + citation), same pattern as the BIM-detail steps above. `docs/materials/`'s 13 PDFs do
+**not** contain civil-engineering standards (they're this app's own frontend/API/DB/prompt
+specs) — every citation below came from external research (STAS/NP/CR/EN standard text and
+technical-press summaries of it), not from `docs/materials/`.
+
+### Done
+
+- **Module 1 — Foundation (fundație)**: `packages/bim-engine/src/foundation.ts` (unit-tested):
+  - `resolveFrostDepthMm(locality)` — minimum foundation depth per **STAS 6054-77** ("Adâncimi
+    maxime de îngheț"), which is a nationwide isoline map, not a per-județ table; the standard
+    only tabulates a handful of reference localities plus the nationwide range (600–1100mm, avg
+    ~750mm). `FROST_DEPTH_MM_BY_LOCALITY` cites the exact values for București/Cluj/Iași (900mm),
+    Timiș/Timișoara/Constanța (800mm), Brașov/Botoșani/Dorohoi (1000mm). An unmatched or missing
+    locality returns `FALLBACK_FROST_DEPTH_MM` (900mm — the max among the cited lowland
+    localities) with `verified: false`, surfaced the same way `specSheet.priceVerified` is
+    surfaced — a real STAS ceiling, not an invented number, but not confirmed against a
+    site-specific geotechnical study either (STAS 6054-77 itself excludes altitudes >1000m and
+    the Danube Delta from any table-based value).
+  - `deriveStripFootingWidthMm(wallThicknessMm)` — wall thickness + 150mm overhang per side
+    (commonly cited constructive rule for ordinary residential loads), floored at 600mm. The
+    load-driven width a specific soil/wall actually needs is a geotechnical calculation (NP
+    112-2014 Part I) this does not perform.
+  - `deriveStripFootingReinforcement()` — **NP 112-2014** continuous-footing constructive
+    minimums: transverse resistance bars (across the footing width) Ø10mm @ 250mm spacing;
+    longitudinal distribution bars (along the footing run) Ø6mm @ 250mm. Always the code floor,
+    not load-sized.
+  - `STRIP_FOOTING_COVER_MM = 40` — **EN 1992-1-1 §4.4.1.3(4)** (the basis for NE 012/1-2022
+    Annex J): 40mm minimum cover for concrete cast against prepared ground/blinding (this
+    footing sits on a lean-concrete layer, not directly on soil, which would need 75mm). As with
+    the seeded concrete-cover note elsewhere, a structural engineer must confirm the exact
+    Romanian national-annex figure before construction use.
+  - Lean/leveling concrete (`beton de egalizare`) under the footing: C8/10, 100mm, unreinforced —
+    widely-cited constructive practice, not part of the structural design. Structural footing
+    concrete: C16/20 (NP 112-2014/NE 012-2022's typical minimum for an ordinary residential strip
+    footing).
+  - `RebarRole` gained a `TRANSVERSE` value (migration `add_transverse_rebar_role`) — a strip
+    footing's two rebar mats aren't both "longitudinal" in the wall/column sense; distribution
+    bars (parallel to the footing run) reuse `LONGITUDINAL`, resistance bars (perpendicular) are
+    the new `TRANSVERSE`.
+  - Two new seeded `GENERIC_DEFAULT` materials: `Beton de egalizare C8/10`, `Beton C16/20` (both
+    cite NP 112-2014 / NE 012/1-2022, `priceVerified: false` like every other seeded price).
+  - `HousesService.getFoundation(houseId)` (`GET /houses/:id/foundation`) auto-provisions one
+    `Foundation` row + its two `AssemblyLayer`s (lean + structural concrete) + two
+    `ReinforcementSpec`s (TRANSVERSE + LONGITUDINAL) on first access, idempotent — mirrors
+    `getWallLayers`, not `getWallReinforcement`'s "don't invent" stance, because *every* house
+    needs some foundation (unlike a wall, which may legitimately carry no rebar). Depth/width are
+    derived from the house's actual load-bearing wall thickness and the project's `Plot.county`/
+    `Plot.city`. `depthVerified` is recomputed from the *current* Plot locality on every read
+    rather than persisted at provision time, so filling in the site address later doesn't leave a
+    stale "unverified" flag. Covered by `apps/api/test/foundation.e2e-spec.ts` (verified-locality
+    depth, fallback-locality depth, idempotency).
+  - Not yet done: no UI panel (mirroring `WallLayerPanel`) surfaces this to the user yet; no cost
+    engine BOQ line for the foundation (still the flat `structure: 800 RON/m²` rate).
+
+- **Module 2 — Confined masonry: stâlpișori (tie-columns) + buiandrug (lintels), CR6-2013**.
+  **Correction from the original module-2 plan above**: an earlier (unshipped) draft assumed a
+  tie-column was required flanking every door/window opening jamb. A user correction plus
+  follow-up research established this is wrong — CR6-2013 defines three tie-column categories:
+  **S1** (every corner/T/X wall-intersection, always required), **S2** (intermediate columns
+  limiting spacing to ≤4–5m along a run), and **S3** (columns flanking an opening, but only
+  *conditionally*: high-seismicity zones ag≥0.25g + openings ≥1.5m², or lower zones + openings
+  ≥2.5m², or when residual masonry pier-length minimums aren't met). This project has no cited
+  peak-ground-acceleration-by-locality table, so **only S1 and S2 are implemented**; S3 is a
+  documented gap, not a guess. A plain opening jamb correctly gets **no** column — instead,
+  every opening gets a **lintel (buiandrug)**, which is the actual, always-required tying-
+  together element over an opening (separately confirmed as standard/effectively-mandatory
+  practice, prefabricated by default).
+  - `packages/bim-engine/src/confined-masonry.ts` (unit-tested):
+    - `detectCornerAndIntersectionPoints` — S1 geometry: clusters load-bearing wall endpoints
+      (5cm tolerance) and flags non-collinear 2-way joins (a real corner, angle test at 5°
+      tolerance — a straight 2-wall collinear join is correctly *not* a corner, since it's one
+      physical run split into two `Wall` rows) and any ≥3-way junction; separately detects a
+      wall endpoint landing on another wall's *interior* span (a T-junction, e.g. an interior
+      partition meeting an exterior wall mid-run) via point-to-segment projection.
+    - `detectMidSpanTieColumns` — S2 geometry: for a load-bearing wall longer than
+      `MAX_TIE_COLUMN_SPACING_M` (4.0m — the conservative/tighter end of the cited 4–5m range,
+      since this project has no "sparse vs dense wall plan" classification to pick the looser
+      5m), evenly-spaced intermediate points so no gap exceeds the max.
+    - `deriveTieColumnReinforcement` — CR6-2013 constructive minimums: 250×250mm cross-section,
+      4×Ø14mm longitudinal (the *higher*-seismicity-zone bar size, used unconditionally as a
+      safe/conservative default in the absence of a cited ag-by-locality table — 4×Ø14 always
+      satisfies the lower-zone 4×Ø12 minimum too, just over-conservatively), Ø6mm stirrups at
+      150mm, 25mm cover (EN 1992-1-1 Table 4.4N, exposure class XC1 — dry/interior element),
+      C12/15 minimum confining-element concrete class (CR6-2013 / Normativ 12/2008 Tab. 1).
+    - `deriveLintelSpec` — prefabricated by default (Porotherm A12 or equivalent product line);
+      250mm bearing into the wall on each side (manufacturer datasheet — a separate secondary
+      source cites a much larger >400mm figure, but that appears to describe non-structural
+      infill-panel masonry in RC-frame buildings, not this case, so the datasheet figure is
+      used, flagged for engineer confirmation); length = opening width + 2×bearing; width =
+      wall thickness. Monolithic cast-in-place lintel reinforcement (bar count/diameter/
+      stirrups) has no primary-source citation this project could find — deliberately not
+      generated, not guessed.
+  - `ReinforcementSpec` gained `tieColumnId` (extending the polymorphic-parent CHECK to
+    wall/foundation/tie-column, exactly one) and a nullable `barCount` — a tie-column's 4 fixed
+    corner bars aren't a spacing-derived count the way a wall/footing mat's bars are, so
+    `spacingMm` alone (as used for those) couldn't represent it; `barCount` is set for the
+    tie-column's `LONGITUDINAL` row, left null elsewhere.
+  - New models: `TieColumn` (owned by `House` directly, not a specific `Wall` — a corner column
+    is naturally shared by the ≥2 walls that meet there) and `Lintel` (1:1 with `Opening`, FK to
+    a `Material` for the prefab product — no `ReinforcementSpec` relation, per the "not modeled"
+    reasoning above). `MaterialCategory` gained `PRECAST`. Seeded `Beton C12/15` and
+    `Buiandrug prefabricat` (Porotherm A12 citation) `GENERIC_DEFAULT` materials.
+  - `HousesService.getTieColumns(houseId)` (`GET /houses/:id/tie-columns`) auto-provisions S1+S2
+    placements (computed per floor) + their reinforcement, idempotent like `getFoundation`.
+    `HousesService.getLintel(openingId)` (`GET /houses/openings/:id/lintel`) auto-provisions one
+    `Lintel` per opening, idempotent. Covered by `apps/api/test/confined-masonry.e2e-spec.ts`
+    (corner placement, mid-span spacing, **no column beside a plain opening** — the corrected
+    behavior — lintel bearing/dimensions, idempotency of both).
+  - Not yet done: no UI panel; no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer
+    geometry (tie-columns would need their own instanced-box + bent-stirrup-loop rendering,
+    related to but not the same gap as the pre-existing Step 9 wall-stirrup gap).
+
+- **Module 3 — Centuri (ring beams)**. **Citation-confidence note**: before starting this
+  module, a dedicated research pass specifically tried OFFICIAL sources (ASRO, MDLPA,
+  legislatie.just.ro/Portal Legislativ, cnadnr.ro, INFP) per an explicit user requirement. Every
+  official PDF host tried returned HTTP 403 in this project's environment — a systematic block
+  (confirmed across many distinct domains and multiple attempts), not a one-off failure. The
+  numbers below come from `WebSearch`'s own synthesis of indexed secondary sources, but were
+  independently corroborated by **two separate queries converging on identical values** before
+  being accepted — higher confidence than a single-source citation, but still not a primary-text
+  quote. A structural engineer should confirm against a purchased/official copy of CR6-2013
+  before construction use, same as every other seeded structural default in this project.
+  - `packages/bim-engine/src/centura.ts` (unit-tested):
+    - `deriveCenturaLevels` — one centură per load-bearing wall at its own floor level (CR6-2013:
+      "provided in the plane of the walls at all floor levels"), **plus** a second centură
+      (reusing the topmost floor's wall footprints) one level above the top floor, for CR6-2013's
+      "level above the last residential level, for buildings with non-walkable attics" case. This
+      project has no walkable-vs-non-walkable-attic field on `House` yet, so the extra level is
+      always generated — the conservative default (an unneeded centură under a walkable attic is
+      merely extra, never a missing requirement), consistent with every other "default toward
+      more structure, not less" choice in these modules.
+    - `deriveCenturaHeightMm`/`deriveCenturaWidthMm` — height = floor-slab thickness for an
+      interior wall, **double** that for a perimeter (exterior) wall; width = wall thickness.
+      Slab thickness has no field anywhere in this schema yet, so it uses
+      `DEFAULT_SLAB_THICKNESS_MM = 130` — the upper (more conservative, since centură height
+      scales with it), cited end of STAS 10107/2-92's "12-13cm" typical residential
+      monolithic-slab-thickness range. The load/span-specific slab thickness a real floor needs
+      is a structural calculation this module does not perform.
+    - `deriveCenturaReinforcement` — longitudinal reinforcement ratio 0.5%, realized as bars at
+      the cited minimum Ø10mm, bar count derived from the ratio and floored at 4 (2 top + 2
+      bottom, the ordinary confining-element arrangement — occasionally more for a deep
+      perimeter centură where 4×Ø10 alone would fall under 0.5%). Ø6mm stirrups at ≤150mm.
+      Concrete class C12/15 and 25mm cover reuse the same confining-element minimums Module 2
+      already cited (CR6-2013 / Normativ 12/2008 Tab. 1; EN 1992-1-1 Table 4.4N XC1) — a bonus
+      finding from this module's research directly cross-checked and confirmed Module 2's
+      conservative 4×Ø14 tie-column choice (a cited by-seismic-zone table: 1% ratio at ag>0.25,
+      0.8% at ag=0.15–0.20, 0.6% at ag=0.10 — 4×Ø14 in a 250×250mm section satisfies all three).
+  - New `Centura` model, owned by `House` but tied to the specific `Wall` whose footprint it
+    follows (unlike `TieColumn`, a centură has real length/direction, not just a point) — `level`
+    distinguishes the wall's own floor from the extra above-top-floor case, so a topmost-floor
+    wall gets two `Centura` rows sharing one `wallId`. `ReinforcementSpec` gained `centuraId`
+    (widening the polymorphic-parent CHECK to 4 mutually-exclusive parents).
+  - `HousesService.getCenturi(houseId)` (`GET /houses/:id/centuri`) auto-provisions per-floor
+    placements + reinforcement, idempotent like `getFoundation`/`getTieColumns`. Covered by
+    `apps/api/test/centura.e2e-spec.ts` (own-level + above-top-floor placement, exterior-vs-
+    interior height doubling, idempotency).
+  - Not yet done: no UI panel; no cost engine BOQ lines; no 3D-viewer geometry; the wall-set-back
+    width variant (250mm when set back for exterior insulation) isn't modeled, only the
+    wall-thickness-matching width.
+
+### Next (not started, planned in order)
+
+- **S3 tie-columns** (opening-triggered) — needs a cited peak-ground-acceleration-by-locality
+  (ag) table (STAS-6054-77-style research, but for P100-1/2013 seismic zonation) and validated
+  minimum-pier-length thresholds; both are documented gaps in Module 2, not implemented. The
+  Module 3 research pass found individual cited points (București ag=0.30g, Iași ag=0.25g) but
+  not a usable full by-locality table — still an open gap.
+- **Module 4 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
+  non-confined-masonry (frame) house type exists; the project is masonry-only today.
+- Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing/
+  tie-column/centură cases above (walls, slabs) — deliberately left open, not guessed. The
+  Module 3 research pass confirmed the table lives in NE 012/1-2022 Annex J but could not
+  retrieve the actual mm values (official PDF hosts systematically 403 in this environment).
+- Monolithic (non-prefabricated) lintel reinforcement — no primary-source citation found yet;
+  the prefabricated default (this module's actual output) doesn't need it, but a monolithic
+  override path eventually will.
+- **Future feature (not started, explicitly deferred by the user until the law-module sequence
+  finishes)**: an interactive editor where resizing a structural element (e.g. widening a door)
+  correctly re-details the rebar running through/around it — including inserting a lap splice
+  when a continuous bar run would exceed standard stock length, and precise corner bends — plus
+  the same edits triggerable via natural-language AI chat requests (extending
+  `design_update`/`AiService.applyDesignUpdate`). User-confirmed: rebar stock comes in both 6m
+  and 12m standard lengths. Splice-length/bend-radius formulas (EN 1992-1-1 §8.3/§8.7,
+  SR 438-1) still need their own official-source research pass before implementation.
 
 ## Deployment targets
 - **API**: Fly.io (Node.js)
@@ -328,15 +522,56 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     the brick path stays browser-verifiable in CI containers — both paths verified: default
     run stays at `medium` with the notice, override run renders the 2,774 bricks).
 
-### Next (Steps 7–9, not started)
+- **Step 7 — opening-aware cut-brick generation**: `generateBrickLayout`/`calculateBrickQuantity`/
+  `generateWallBrickInstances` now take an optional `WallOpeningMm[]` (maps 1:1 from the
+  `Opening` row: `position` = meters from the wall's start point to the near jamb, `sillHeight` =
+  bottom above the wall base — this convention is documented on both the bim-engine type and the
+  web store's `Opening`). Coursing rules, all unit-tested against hand-calculated references in
+  `masonry-openings.spec.ts`:
+  - Courses no opening touches keep the plain global running bond — opening-free walls produce
+    **identical** layouts to the pre-step-7 algorithm (regression-tested with `toEqual`).
+  - Courses beside an opening are re-anchored FROM the jamb: odd courses start against the jamb
+    with a half brick (P2-85 joint-offset bonding), whole modules follow, the leftover cut lands
+    away from the opening (far wall end / between two openings). A segment bounded by the wall
+    start on its left and a jamb on its right anchors from the right (mirrored).
+  - Courses the sill/head line crosses mid-course get height-cut strip pieces filling exactly
+    the band below the sill / above the head (lintel soffit), `isCut: true`; pieces under 10mm
+    read as mortar, not brick slivers.
+  - Cut bricks still render through the same per-instance-scaled pools — each cut piece carries
+    its own precise dimensions in its instance matrix (no separate non-instanced mesh needed;
+    the darker `instanceColor` tint marks cuts).
+  - Threading: `House.openings` added to the web store (the API already returned them);
+    `useBrickInstances` puts per-wall openings into worker jobs **and cache keys** (adding an
+    opening invalidates only that wall — browser-verified: count dropped 2,438 → 2,418 when a
+    window was added live). `WallMesh`'s detail-mode mortar core is decomposed into patches
+    around openings (same rectangle subtraction) so holes read as real holes.
+  - Cost engine (the promise in the old `costs.service.ts` comment, now fulfilled): BOQ uses net
+    wall area (gross − openings) for M2/M3/piecesPerM2 layers and opening-aware
+    `calculateBrickQuantity` for the geometric BUC fallback — its `wholeBrickCount` is now
+    ceil(run/module) per course-run, so an opening can never *increase* the count. `POST
+    /houses/:id/openings` controller route added (the service method existed but was never
+    exposed). Covered by a new case in `cost-boq.e2e-spec.ts`.
+  - Known limits: overlapping openings on one wall are unsupported (invalid geometry); the
+    medium/far abstract wall box still renders solid — only the detail tier and the mortar core
+    are opening-aware.
 
-7. **Opening-aware cut-brick generation** — the largest unresolved engineering risk. Real,
-   individually-modeled (not instanced) cut bricks at the jambs/lintel of each `Opening`,
-   centimeter-precise per `Opening.position/width/height/sillHeight`, with coursing anchored
-   from the opening using half-bricks. Only the bricks touching an opening need this — the bulk
-   of a wall away from openings stays instanced whole-brick.
-8. **Longitudinal rebar instancing** — render `bim-engine`'s existing
-   `generateLongitudinalRebarLayout` output as instanced straight cylinders.
+- **Step 8 — longitudinal rebar instancing**: new `packages/bim-engine/src/rebar-instancing.ts`
+  (`composeRebarInstanceMatrices`/`generateWallLongitudinalRebarInstances`, unit-tested) turns
+  `generateLongitudinalRebarLayout` output into column-major instance matrices over a **unit
+  cylinder** (`CylinderGeometry(0.5, 0.5, 1)`, axis Y) — same placement convention as the brick
+  instancing. `GET /houses/walls/:id/reinforcement` added with **no auto-provisioning**,
+  deliberately: masonry walls carry no rebar and Key rule 7 forbids invented structural
+  defaults — `ReinforcementSpec` rows exist only where reinforcement was actually specified
+  (seed/DB only for now; no UI creates them yet). `useRebarInstances` computes on the main
+  thread (a few bars per wall — no worker needed) and pools per floor; `RebarInstances` renders
+  steel-gray Lambert cylinders, LOD-gated at `detail` like bricks. A wall that has bars but no
+  brick detail renders its abstract box translucent (the usual BIM reinforcement-view
+  convention) so the bars read. Overlay gained `viewer3d.rebarCountLabel` (all 3 locales).
+  Browser-verified on a seeded C25/30 wall (Ø12 @ 150mm, 25mm cover — SR 438-1-range values):
+  overlay reports the 2 computed bars, wall translucency confirmed visually.
+
+### Next (Step 9, not started)
+
 9. **Stirrup/bent rebar** — needs both a new `bim-engine` calc function (stirrups are a bent
    closed loop, not a straight bar — geometrically distinct from longitudinal rebar) and a
    separate instance pool/geometry in the 3D viewer.

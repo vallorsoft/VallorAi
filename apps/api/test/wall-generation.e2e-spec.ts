@@ -124,6 +124,22 @@ describe('Generated walls from AI rooms (e2e)', () => {
     expect(upperWalls.every((w) => w.isExterior)).toBe(true)
   })
 
+  it('rebuild regenerates walls even when every design_update was already applied (pre-fix houses)', async () => {
+    const house = await prisma.house.findUniqueOrThrow({ where: { projectId } })
+    // Simulate a house whose rooms were applied before wall generation
+    // existed: rooms present + appliedRoom markers set, but no walls.
+    await prisma.wall.deleteMany({ where: { houseId: house.id, isGenerated: true } })
+
+    const rebuildRes = await request(server)
+      .post(`/api/v1/ai/projects/${projectId}/rebuild`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201)
+    expect(rebuildRes.body.data.appliedCount).toBe(0) // nothing new to apply…
+
+    const walls = await prisma.wall.findMany({ where: { houseId: house.id, isGenerated: true } })
+    expect(walls.length).toBeGreaterThan(0) // …but the walls are back
+  })
+
   it('re-derives generated walls when a room is deleted, and never touches manual walls', async () => {
     const house = await prisma.house.findUniqueOrThrow({ where: { projectId } })
 

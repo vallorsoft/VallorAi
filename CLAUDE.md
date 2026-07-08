@@ -328,15 +328,56 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     the brick path stays browser-verifiable in CI containers — both paths verified: default
     run stays at `medium` with the notice, override run renders the 2,774 bricks).
 
-### Next (Steps 7–9, not started)
+- **Step 7 — opening-aware cut-brick generation**: `generateBrickLayout`/`calculateBrickQuantity`/
+  `generateWallBrickInstances` now take an optional `WallOpeningMm[]` (maps 1:1 from the
+  `Opening` row: `position` = meters from the wall's start point to the near jamb, `sillHeight` =
+  bottom above the wall base — this convention is documented on both the bim-engine type and the
+  web store's `Opening`). Coursing rules, all unit-tested against hand-calculated references in
+  `masonry-openings.spec.ts`:
+  - Courses no opening touches keep the plain global running bond — opening-free walls produce
+    **identical** layouts to the pre-step-7 algorithm (regression-tested with `toEqual`).
+  - Courses beside an opening are re-anchored FROM the jamb: odd courses start against the jamb
+    with a half brick (P2-85 joint-offset bonding), whole modules follow, the leftover cut lands
+    away from the opening (far wall end / between two openings). A segment bounded by the wall
+    start on its left and a jamb on its right anchors from the right (mirrored).
+  - Courses the sill/head line crosses mid-course get height-cut strip pieces filling exactly
+    the band below the sill / above the head (lintel soffit), `isCut: true`; pieces under 10mm
+    read as mortar, not brick slivers.
+  - Cut bricks still render through the same per-instance-scaled pools — each cut piece carries
+    its own precise dimensions in its instance matrix (no separate non-instanced mesh needed;
+    the darker `instanceColor` tint marks cuts).
+  - Threading: `House.openings` added to the web store (the API already returned them);
+    `useBrickInstances` puts per-wall openings into worker jobs **and cache keys** (adding an
+    opening invalidates only that wall — browser-verified: count dropped 2,438 → 2,418 when a
+    window was added live). `WallMesh`'s detail-mode mortar core is decomposed into patches
+    around openings (same rectangle subtraction) so holes read as real holes.
+  - Cost engine (the promise in the old `costs.service.ts` comment, now fulfilled): BOQ uses net
+    wall area (gross − openings) for M2/M3/piecesPerM2 layers and opening-aware
+    `calculateBrickQuantity` for the geometric BUC fallback — its `wholeBrickCount` is now
+    ceil(run/module) per course-run, so an opening can never *increase* the count. `POST
+    /houses/:id/openings` controller route added (the service method existed but was never
+    exposed). Covered by a new case in `cost-boq.e2e-spec.ts`.
+  - Known limits: overlapping openings on one wall are unsupported (invalid geometry); the
+    medium/far abstract wall box still renders solid — only the detail tier and the mortar core
+    are opening-aware.
 
-7. **Opening-aware cut-brick generation** — the largest unresolved engineering risk. Real,
-   individually-modeled (not instanced) cut bricks at the jambs/lintel of each `Opening`,
-   centimeter-precise per `Opening.position/width/height/sillHeight`, with coursing anchored
-   from the opening using half-bricks. Only the bricks touching an opening need this — the bulk
-   of a wall away from openings stays instanced whole-brick.
-8. **Longitudinal rebar instancing** — render `bim-engine`'s existing
-   `generateLongitudinalRebarLayout` output as instanced straight cylinders.
+- **Step 8 — longitudinal rebar instancing**: new `packages/bim-engine/src/rebar-instancing.ts`
+  (`composeRebarInstanceMatrices`/`generateWallLongitudinalRebarInstances`, unit-tested) turns
+  `generateLongitudinalRebarLayout` output into column-major instance matrices over a **unit
+  cylinder** (`CylinderGeometry(0.5, 0.5, 1)`, axis Y) — same placement convention as the brick
+  instancing. `GET /houses/walls/:id/reinforcement` added with **no auto-provisioning**,
+  deliberately: masonry walls carry no rebar and Key rule 7 forbids invented structural
+  defaults — `ReinforcementSpec` rows exist only where reinforcement was actually specified
+  (seed/DB only for now; no UI creates them yet). `useRebarInstances` computes on the main
+  thread (a few bars per wall — no worker needed) and pools per floor; `RebarInstances` renders
+  steel-gray Lambert cylinders, LOD-gated at `detail` like bricks. A wall that has bars but no
+  brick detail renders its abstract box translucent (the usual BIM reinforcement-view
+  convention) so the bars read. Overlay gained `viewer3d.rebarCountLabel` (all 3 locales).
+  Browser-verified on a seeded C25/30 wall (Ø12 @ 150mm, 25mm cover — SR 438-1-range values):
+  overlay reports the 2 computed bars, wall translucency confirmed visually.
+
+### Next (Step 9, not started)
+
 9. **Stirrup/bent rebar** — needs both a new `bim-engine` calc function (stirrups are a bent
    closed loop, not a straight bar — geometrically distinct from longitudinal rebar) and a
    separate instance pool/geometry in the 3D viewer.

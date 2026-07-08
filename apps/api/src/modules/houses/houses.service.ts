@@ -107,6 +107,20 @@ export class HousesService {
     })
   }
 
+  /**
+   * A wall's reinforcement specs (LONGITUDINAL / STIRRUP rebar). Unlike
+   * getWallLayers there is NO auto-provisioning here: plain masonry walls
+   * carry no reinforcement, and inventing a structural rebar default would
+   * violate Key rule 7 (every value must trace to a real source). Rows exist
+   * only where reinforcement was actually specified for the element.
+   */
+  async getWallReinforcement(wallId: string) {
+    return prisma.reinforcementSpec.findMany({
+      where: { wallId },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
+
   private async provisionDefaultWallAssembly(wallId: string, isExterior: boolean) {
     const byName = async (name: string) =>
       prisma.material.findFirstOrThrow({ where: { name, source: 'GENERIC_DEFAULT' } })

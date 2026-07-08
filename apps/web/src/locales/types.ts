@@ -112,6 +112,7 @@ export interface Dictionary {
       lodLabel: string
       masonryComputing: string
       brickCountLabel: string
+      rebarCountLabel: string
       fpsLabel: string
       lowPerfNotice: string
     }

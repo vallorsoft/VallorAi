@@ -31,6 +31,12 @@ workerScope.addEventListener('message', (event: MessageEvent) => {
         thicknessMm: job.thicknessM * 1000,
       },
       job.brick,
+      job.openings.map((o) => ({
+        positionMm: o.position * 1000,
+        widthMm: o.width * 1000,
+        heightMm: o.height * 1000,
+        sillHeightMm: o.sillHeight * 1000,
+      })),
     )
     results.push({ wallId: job.wallId, cacheKey: job.cacheKey, count, matrices, cutFlags })
     transfer.push(matrices.buffer, cutFlags.buffer)

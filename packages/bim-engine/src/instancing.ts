@@ -1,5 +1,5 @@
 import { generateBrickLayout } from './masonry'
-import type { BrickInstanceTransform, BrickModule } from './types'
+import type { BrickInstanceTransform, BrickModule, WallOpeningMm } from './types'
 
 /**
  * Where a wall sits in the scene, in millimeters, using the 3D viewer's axis
@@ -94,12 +94,13 @@ export function composeBrickInstanceMatrices(
 
 /**
  * Convenience wrapper: running-bond layout (see masonry.ts) + world-space
- * matrix composition for a single wall. Opening-free walls only, same as
- * generateBrickLayout (opening-aware cutting is roadmap step 7).
+ * matrix composition for a single wall, with door/window openings subtracted
+ * and jamb/sill/lintel pieces cut to fit (opening-aware coursing, step 7).
  */
 export function generateWallBrickInstances(
   placement: WallPlacementMm,
   brick: BrickModule,
+  openings: WallOpeningMm[] = [],
 ): BrickInstancingResult {
   const dx = placement.endXMm - placement.startXMm
   const dz = placement.endZMm - placement.startZMm
@@ -110,6 +111,7 @@ export function generateWallBrickInstances(
   const layout = generateBrickLayout(
     { lengthMm, heightMm: placement.heightMm, thicknessMm: placement.thicknessMm },
     brick,
+    openings,
   )
   return composeBrickInstanceMatrices(placement, layout)
 }

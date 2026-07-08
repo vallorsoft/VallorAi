@@ -24,8 +24,27 @@ export interface WallDimensions {
   thicknessMm: number
 }
 
+/**
+ * A door/window rectangle in wall-local coordinates, mm. Maps 1:1 from the
+ * `Opening` DB row (position/width/height/sillHeight, meters → mm): the wall
+ * is a 2D strip of `lengthMm × heightMm`, X runs from the wall's start point
+ * toward its end point, Y up from the wall base.
+ */
+export interface WallOpeningMm {
+  /** Distance from the wall's start point to the opening's near jamb. */
+  positionMm: number
+  widthMm: number
+  heightMm: number
+  /** Bottom of the opening above the wall base — 0 for doors. */
+  sillHeightMm: number
+}
+
 export interface BrickQuantity {
-  /** Whole-brick instances (openings not yet accounted for — see bim-engine roadmap step 7). */
+  /**
+   * Purchased brick modules: ceil(run length / module length) per course.
+   * Openings shorten the runs (saving the modules the hole displaced) while
+   * sill/lintel cut strips still consume one module per cut piece.
+   */
   wholeBrickCount: number
   /** Courses in the wall height. */
   courseCount: number

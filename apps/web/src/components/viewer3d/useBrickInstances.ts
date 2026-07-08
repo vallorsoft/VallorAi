@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { brickModuleFromSpecSheet, type BrickModule } from '@ai-home-designer/bim-engine'
 import { fetchWallLayers, type WallAssemblyLayer } from '@/hooks/useProjects'
-import type { House, Wall } from '@/store/project.store'
+import type { House, Opening, Wall } from '@/store/project.store'
 import type {
+  BrickWorkerOpening,
   BrickWorkerRequest,
   BrickWorkerResponse,
   BrickWorkerWallJob,
@@ -61,13 +62,24 @@ interface WallBrickSpec {
   materialCategory: string
   materialName: string
   brick: BrickModule
+  openings: BrickWorkerOpening[]
 }
 
-function structuralBrickSpec(wall: Wall, layers: WallAssemblyLayer[]): WallBrickSpec | null {
+function structuralBrickSpec(
+  wall: Wall,
+  layers: WallAssemblyLayer[],
+  wallOpenings: Opening[],
+): WallBrickSpec | null {
   const structural = layers.find((layer) => layer.function === 'STRUCTURAL')
   if (!structural) return null
   const brick = brickModuleFromSpecSheet(structural.material.specSheet)
   if (!brick) return null
+  const openings: BrickWorkerOpening[] = wallOpenings.map((o) => ({
+    position: o.position,
+    width: o.width,
+    height: o.height,
+    sillHeight: o.sillHeight,
+  }))
   const cacheKey = JSON.stringify([
     wall.id,
     wall.startX,
@@ -78,6 +90,7 @@ function structuralBrickSpec(wall: Wall, layers: WallAssemblyLayer[]): WallBrick
     wall.thickness,
     structural.material.id,
     brick,
+    openings,
   ])
   return {
     wall,
@@ -86,6 +99,7 @@ function structuralBrickSpec(wall: Wall, layers: WallAssemblyLayer[]): WallBrick
     materialCategory: structural.material.category,
     materialName: structural.material.name,
     brick,
+    openings,
   }
 }
 
@@ -105,6 +119,15 @@ export function useBrickInstances(house: House | null, active: boolean): BrickIn
   }, [active])
 
   const walls = useMemo(() => house?.walls ?? [], [house])
+  const openingsByWall = useMemo(() => {
+    const map = new Map<string, Opening[]>()
+    for (const opening of house?.openings ?? []) {
+      const list = map.get(opening.wallId) ?? []
+      list.push(opening)
+      map.set(opening.wallId, list)
+    }
+    return map
+  }, [house])
 
   const layerQueries = useQueries({
     queries: walls.map((wall) => ({
@@ -122,13 +145,13 @@ export function useBrickInstances(house: House | null, active: boolean): BrickIn
     walls.forEach((wall, i) => {
       const layers = layerQueries[i]?.data
       if (!layers) return
-      const spec = structuralBrickSpec(wall, layers)
+      const spec = structuralBrickSpec(wall, layers, openingsByWall.get(wall.id) ?? [])
       if (spec) result.push(spec)
     })
     return result
     // layerQueries is a new array each render; depend on the data references.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activated, walls, ...layerQueries.map((q) => q.data)])
+  }, [activated, walls, openingsByWall, ...layerQueries.map((q) => q.data)])
 
   const cacheRef = useRef(new Map<string, CachedWallBricks>())
   const pendingKeysRef = useRef(new Set<string>())
@@ -202,6 +225,7 @@ export function useBrickInstances(house: House | null, active: boolean): BrickIn
         heightM: spec.wall.height,
         thicknessM: spec.wall.thickness,
         brick: spec.brick,
+        openings: spec.openings,
       })
     }
     if (jobs.length === 0) return

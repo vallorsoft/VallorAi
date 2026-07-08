@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { prisma, type Wall } from '@ai-home-designer/database'
-import { calculateBrickQuantity, type BrickModule, type WallDimensions } from '@ai-home-designer/bim-engine'
+import { prisma, type Opening, type Wall } from '@ai-home-designer/database'
+import {
+  calculateBrickQuantity,
+  type BrickModule,
+  type WallDimensions,
+  type WallOpeningMm,
+} from '@ai-home-designer/bim-engine'
 import { HousesService } from '../houses/houses.service'
 
 export interface CostItem {
@@ -47,7 +52,7 @@ export class CostsService {
   async estimateByArea(houseId: string): Promise<{ breakdown: CostItem[]; total: number; currency: string }> {
     const house = await prisma.house.findUnique({
       where: { id: houseId },
-      include: { rooms: true, walls: true },
+      include: { rooms: true, walls: { include: { openings: true } } },
     })
     if (!house) throw new NotFoundException('House not found')
 
@@ -88,16 +93,20 @@ export class CostsService {
    * Real, bottom-up bill-of-quantities lines from each wall's actual layer
    * assembly (see HousesService.getWallLayers) — replaces the flat
    * masonry/plastering/painting/insulation area-rate guesses once wall data
-   * exists. Openings are not yet subtracted from wall area (that lands with
-   * the opening-aware brick-cutting work) — this is a deliberate, documented
-   * simplification, not an oversight.
+   * exists. Door/window openings are subtracted: area-based layers (render,
+   * plaster, paint, insulation…) use the net wall area, and the geometric
+   * brick fallback runs bim-engine's opening-aware coursing count.
    */
-  private async calculateWallAssemblyBoq(walls: Wall[]): Promise<CostItem[]> {
+  private async calculateWallAssemblyBoq(
+    walls: (Wall & { openings: Opening[] })[],
+  ): Promise<CostItem[]> {
     const lines: CostItem[] = []
 
     for (const wall of walls) {
       const lengthM = Math.hypot(wall.endX - wall.startX, wall.endY - wall.startY)
-      const areaM2 = lengthM * wall.height
+      const grossAreaM2 = lengthM * wall.height
+      const openingsAreaM2 = wall.openings.reduce((s, o) => s + o.width * o.height, 0)
+      const areaM2 = Math.max(0, grossAreaM2 - openingsAreaM2)
       const layers = await this.housesService.getWallLayers(wall.id)
 
       for (const layer of layers) {
@@ -124,7 +133,7 @@ export class CostsService {
     unit: string,
     areaM2: number,
     lengthM: number,
-    wall: Wall,
+    wall: Wall & { openings: Opening[] },
     thicknessMm: number,
     specSheet: Record<string, unknown>,
   ): number {
@@ -146,7 +155,13 @@ export class CostsService {
         heightMm: wall.height * 1000,
         thicknessMm: wall.thickness * 1000,
       }
-      return calculateBrickQuantity(wallDims, brick).wholeBrickCount
+      const openings: WallOpeningMm[] = wall.openings.map((o) => ({
+        positionMm: o.position * 1000,
+        widthMm: o.width * 1000,
+        heightMm: o.height * 1000,
+        sillHeightMm: o.sillHeight * 1000,
+      }))
+      return calculateBrickQuantity(wallDims, brick, openings).wholeBrickCount
     }
     if (unit === 'M3') {
       return areaM2 * (thicknessMm / 1000)

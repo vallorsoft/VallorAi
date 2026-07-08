@@ -346,6 +346,7 @@ enum LayerFunction {
 enum RebarRole {
   LONGITUDINAL
   STIRRUP
+  TRANSVERSE
 }
 
 model Material {

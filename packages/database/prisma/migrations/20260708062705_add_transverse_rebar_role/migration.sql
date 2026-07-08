@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "RebarRole" ADD VALUE 'TRANSVERSE';

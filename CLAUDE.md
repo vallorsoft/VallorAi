@@ -178,6 +178,82 @@ creating a new singleton table per setting.
 Validated in `apps/api/src/modules/rules/rules.service.ts`.
 Returns `ValidationResult` with `violations[]`, `passedRules[]`, `permitReadiness` (%).
 Permit docs: DTAC, PTh, DDE, PAC, POE.
+This is the **livability/permit** rule set (min room areas, required rooms, corridor width) —
+distinct from the structural "law modules" below, which drive what the system actually builds.
+
+## Romanian structural building-code "law modules" — status
+
+**Goal** (user requirement, explicit direction 2026-07-08): every structural default the system
+builds with — foundation depth/concrete/rebar, confined-masonry tie-columns (`stâlpișori`) and
+ring beams (`centuri`), frame-column reinforcement, concrete cover — must trace to a real,
+cited Romanian standard, the same way Key rule 7 already requires for `Material.specSheet`.
+Rolling out one self-contained module at a time (data model + `bim-engine` pure calc + tests +
+API + citation), same pattern as the BIM-detail steps above. `docs/materials/`'s 13 PDFs do
+**not** contain civil-engineering standards (they're this app's own frontend/API/DB/prompt
+specs) — every citation below came from external research (STAS/NP/CR/EN standard text and
+technical-press summaries of it), not from `docs/materials/`.
+
+### Done
+
+- **Module 1 — Foundation (fundație)**: `packages/bim-engine/src/foundation.ts` (unit-tested):
+  - `resolveFrostDepthMm(locality)` — minimum foundation depth per **STAS 6054-77** ("Adâncimi
+    maxime de îngheț"), which is a nationwide isoline map, not a per-județ table; the standard
+    only tabulates a handful of reference localities plus the nationwide range (600–1100mm, avg
+    ~750mm). `FROST_DEPTH_MM_BY_LOCALITY` cites the exact values for București/Cluj/Iași (900mm),
+    Timiș/Timișoara/Constanța (800mm), Brașov/Botoșani/Dorohoi (1000mm). An unmatched or missing
+    locality returns `FALLBACK_FROST_DEPTH_MM` (900mm — the max among the cited lowland
+    localities) with `verified: false`, surfaced the same way `specSheet.priceVerified` is
+    surfaced — a real STAS ceiling, not an invented number, but not confirmed against a
+    site-specific geotechnical study either (STAS 6054-77 itself excludes altitudes >1000m and
+    the Danube Delta from any table-based value).
+  - `deriveStripFootingWidthMm(wallThicknessMm)` — wall thickness + 150mm overhang per side
+    (commonly cited constructive rule for ordinary residential loads), floored at 600mm. The
+    load-driven width a specific soil/wall actually needs is a geotechnical calculation (NP
+    112-2014 Part I) this does not perform.
+  - `deriveStripFootingReinforcement()` — **NP 112-2014** continuous-footing constructive
+    minimums: transverse resistance bars (across the footing width) Ø10mm @ 250mm spacing;
+    longitudinal distribution bars (along the footing run) Ø6mm @ 250mm. Always the code floor,
+    not load-sized.
+  - `STRIP_FOOTING_COVER_MM = 40` — **EN 1992-1-1 §4.4.1.3(4)** (the basis for NE 012/1-2022
+    Annex J): 40mm minimum cover for concrete cast against prepared ground/blinding (this
+    footing sits on a lean-concrete layer, not directly on soil, which would need 75mm). As with
+    the seeded concrete-cover note elsewhere, a structural engineer must confirm the exact
+    Romanian national-annex figure before construction use.
+  - Lean/leveling concrete (`beton de egalizare`) under the footing: C8/10, 100mm, unreinforced —
+    widely-cited constructive practice, not part of the structural design. Structural footing
+    concrete: C16/20 (NP 112-2014/NE 012-2022's typical minimum for an ordinary residential strip
+    footing).
+  - `RebarRole` gained a `TRANSVERSE` value (migration `add_transverse_rebar_role`) — a strip
+    footing's two rebar mats aren't both "longitudinal" in the wall/column sense; distribution
+    bars (parallel to the footing run) reuse `LONGITUDINAL`, resistance bars (perpendicular) are
+    the new `TRANSVERSE`.
+  - Two new seeded `GENERIC_DEFAULT` materials: `Beton de egalizare C8/10`, `Beton C16/20` (both
+    cite NP 112-2014 / NE 012/1-2022, `priceVerified: false` like every other seeded price).
+  - `HousesService.getFoundation(houseId)` (`GET /houses/:id/foundation`) auto-provisions one
+    `Foundation` row + its two `AssemblyLayer`s (lean + structural concrete) + two
+    `ReinforcementSpec`s (TRANSVERSE + LONGITUDINAL) on first access, idempotent — mirrors
+    `getWallLayers`, not `getWallReinforcement`'s "don't invent" stance, because *every* house
+    needs some foundation (unlike a wall, which may legitimately carry no rebar). Depth/width are
+    derived from the house's actual load-bearing wall thickness and the project's `Plot.county`/
+    `Plot.city`. `depthVerified` is recomputed from the *current* Plot locality on every read
+    rather than persisted at provision time, so filling in the site address later doesn't leave a
+    stale "unverified" flag. Covered by `apps/api/test/foundation.e2e-spec.ts` (verified-locality
+    depth, fallback-locality depth, idempotency).
+  - Not yet done: no UI panel (mirroring `WallLayerPanel`) surfaces this to the user yet; no cost
+    engine BOQ line for the foundation (still the flat `structure: 800 RON/m²` rate).
+
+### Next (not started, planned in order)
+
+- **Module 2 — Stâlpișori/centuri (confined-masonry tie-columns and ring beams, CR6-2013)** —
+  the largest of these modules: introduces a data-model concept that doesn't exist yet (a
+  vasbeton element embedded *in* a wall run, not a separate `Wall` row), with real placement
+  rules (every corner/T-junction/opening jamb, ≤4–5m spacing along a run) derived from wall/
+  opening geometry, plus their own constructive-minimum reinforcement (4×Ø12–14mm longitudinal,
+  Ø6mm stirrups at 10–15cm).
+- **Module 3 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
+  non-confined-masonry (frame) house type exists; the project is masonry-only today.
+- Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing case
+  above (walls, slabs) — deliberately left open, not guessed.
 
 ## Deployment targets
 - **API**: Fly.io (Node.js)

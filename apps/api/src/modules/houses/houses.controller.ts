@@ -80,4 +80,9 @@ export class HousesController {
   getWallReinforcement(@Param('id') wallId: string) {
     return this.housesService.getWallReinforcement(wallId)
   }
+
+  @Get(':id/foundation')
+  getFoundation(@Param('id') houseId: string) {
+    return this.housesService.getFoundation(houseId)
+  }
 }

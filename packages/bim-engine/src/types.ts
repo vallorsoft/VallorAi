@@ -63,7 +63,15 @@ export interface BrickInstanceTransform {
   isCut: boolean
 }
 
-export type RebarRole = 'LONGITUDINAL' | 'STIRRUP'
+/**
+ * LONGITUDINAL: parallel to the element's long axis (wall length, footing
+ * run). STIRRUP: bent closed loop confining a column/beam (not yet
+ * generated — step 9). TRANSVERSE: perpendicular to the element's long axis
+ * — a strip footing's main resistance bars run this way, across the
+ * footing width (NP 112-2014), distinct from its longitudinal distribution
+ * bars.
+ */
+export type RebarRole = 'LONGITUDINAL' | 'STIRRUP' | 'TRANSVERSE'
 
 export interface RebarBarSpec {
   diameterMm: number

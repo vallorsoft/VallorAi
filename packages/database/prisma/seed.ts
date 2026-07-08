@@ -86,6 +86,33 @@ async function main() {
       },
     },
     {
+      category: 'CONCRETE',
+      name: 'Beton de egalizare C8/10',
+      standardRef: 'NP 112-2014, NE 012/1-2022',
+      unit: 'M3',
+      unitCostRON: 300,
+      specSheet: {
+        strengthClass: 'C8/10',
+        typicalThicknessMm: 100,
+        purpose: 'lean/leveling layer under strip footings — unreinforced',
+        priceVerified: false,
+        priceSource: 'Estimate pending Bursa Construcțiilor verification',
+      },
+    },
+    {
+      category: 'CONCRETE',
+      name: 'Beton C16/20',
+      standardRef: 'NP 112-2014, NE 012/1-2022',
+      unit: 'M3',
+      unitCostRON: 340,
+      specSheet: {
+        strengthClass: 'C16/20',
+        purpose: 'ordinary residential strip-footing structural concrete',
+        priceVerified: false,
+        priceSource: 'Estimate pending Bursa Construcțiilor verification',
+      },
+    },
+    {
       category: 'REBAR',
       name: 'Oțel beton B500C',
       standardRef: 'SR 438-1:2012',

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
+import { deriveFoundationSpec, resolveFrostDepthMm } from '@ai-home-designer/bim-engine'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
 @Injectable()
@@ -118,6 +119,114 @@ export class HousesService {
     return prisma.reinforcementSpec.findMany({
       where: { wallId },
       orderBy: { createdAt: 'asc' },
+    })
+  }
+
+  /**
+   * The house's constructive-minimum strip-footing spec (concrete +
+   * reinforcement), auto-provisioning a Foundation row on first access if
+   * none exists yet — unlike getWallReinforcement, every house needs SOME
+   * foundation, so a real, standards-cited default (STAS 6054-77 frost
+   * depth + NP 112-2014 constructive minimums, see bim-engine
+   * foundation.ts) is legitimate here, the same way getWallLayers
+   * auto-provisions a wall assembly.
+   *
+   * `depthVerified` is recomputed from the *current* Plot locality on every
+   * call rather than persisted: it reflects whether today's site address
+   * matches a cited STAS 6054-77 locality, which can only get more accurate
+   * as the user fills in the plot address — persisting a stale flag from
+   * provision time would understate that.
+   */
+  async getFoundation(houseId: string) {
+    const include = {
+      assemblyLayers: { include: { material: true }, orderBy: { order: 'asc' as const } },
+      reinforcementSpecs: true,
+    }
+    let foundation = await prisma.foundation.findFirst({ where: { houseId }, include })
+
+    const house = await prisma.house.findUniqueOrThrow({
+      where: { id: houseId },
+      include: { walls: true, project: { include: { plot: true } } },
+    })
+
+    if (!foundation) {
+      await this.provisionDefaultFoundation(house)
+      foundation = await prisma.foundation.findFirstOrThrow({ where: { houseId }, include })
+    }
+
+    const locality = house.project.plot?.county ?? house.project.plot?.city ?? null
+    return { ...foundation, depthVerified: resolveFrostDepthMm(locality).verified }
+  }
+
+  private async provisionDefaultFoundation(house: {
+    id: string
+    walls: { thickness: number; isExterior: boolean; isLoad: boolean }[]
+    project: { plot: { county: string | null; city: string | null } | null }
+  }) {
+    const loadBearingWalls = house.walls.filter((w) => w.isExterior || w.isLoad)
+    const wallThicknessMm = loadBearingWalls.reduce(
+      (max, w) => Math.max(max, w.thickness * 1000),
+      0,
+    )
+    const locality = house.project.plot?.county ?? house.project.plot?.city ?? null
+    const spec = deriveFoundationSpec(wallThicknessMm, locality)
+
+    const [leanConcrete, structuralConcrete] = await Promise.all([
+      prisma.material.findFirstOrThrow({
+        where: { name: 'Beton de egalizare C8/10', source: 'GENERIC_DEFAULT' },
+      }),
+      prisma.material.findFirstOrThrow({
+        where: { name: 'Beton C16/20', source: 'GENERIC_DEFAULT' },
+      }),
+    ])
+
+    const foundation = await prisma.foundation.create({
+      data: {
+        houseId: house.id,
+        depthMm: spec.depthMm,
+        widthMm: spec.widthMm,
+        concreteClass: spec.concreteClass,
+      },
+    })
+
+    await prisma.assemblyLayer.createMany({
+      data: [
+        {
+          foundationId: foundation.id,
+          order: 1,
+          materialId: leanConcrete.id,
+          thicknessMm: spec.leanConcreteThicknessMm,
+          function: 'STRUCTURAL',
+        },
+        {
+          foundationId: foundation.id,
+          order: 2,
+          materialId: structuralConcrete.id,
+          thicknessMm: spec.depthMm,
+          function: 'STRUCTURAL',
+        },
+      ],
+    })
+
+    await prisma.reinforcementSpec.createMany({
+      data: [
+        {
+          foundationId: foundation.id,
+          role: 'TRANSVERSE',
+          barDiameterMm: spec.reinforcement.transverse.diameterMm,
+          spacingMm: spec.reinforcement.transverse.spacingMm,
+          coverMm: spec.reinforcementCoverMm,
+          concreteClass: spec.concreteClass,
+        },
+        {
+          foundationId: foundation.id,
+          role: 'LONGITUDINAL',
+          barDiameterMm: spec.reinforcement.distribution.diameterMm,
+          spacingMm: spec.reinforcement.distribution.spacingMm,
+          coverMm: spec.reinforcementCoverMm,
+          concreteClass: spec.concreteClass,
+        },
+      ],
     })
   }
 

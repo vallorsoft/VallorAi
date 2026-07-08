@@ -274,6 +274,10 @@ model Wall {
   height     Float   @default(2.7)
   isLoad     Boolean @default(false)
   isExterior Boolean @default(false)
+  /// True for walls derived automatically from the room rectangles (bim-engine
+  /// wall-generation) — these are deleted and re-derived on every AI room
+  /// change, so nothing user-drawn may ever carry this flag.
+  isGenerated Boolean @default(false)
   material   String?
 
   house    House     @relation(fields: [houseId], references: [id], onDelete: Cascade)

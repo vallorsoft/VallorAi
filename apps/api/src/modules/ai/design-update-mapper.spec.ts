@@ -72,27 +72,19 @@ describe('roomFromDesignUpdateData', () => {
 
 describe('nextRoomPosition', () => {
   it('places the first room on a floor at the origin', () => {
-    expect(nextRoomPosition([], 0)).toEqual({ posX: 0, posY: 0 })
+    expect(nextRoomPosition([])).toEqual({ posX: 0, posY: 0 })
   })
 
   it('places each subsequent room to the right of the rightmost existing room, with a gap', () => {
-    const pos = nextRoomPosition([{ posX: 0, width: 5 }], 0)
+    const pos = nextRoomPosition([{ posX: 0, width: 5 }])
     expect(pos).toEqual({ posX: 5.3, posY: 0 })
   })
 
   it('uses the rightmost edge across multiple existing rooms, not just the last one', () => {
-    const pos = nextRoomPosition(
-      [
-        { posX: 0, width: 5 },
-        { posX: 5.3, width: 3 },
-      ],
-      0,
-    )
+    const pos = nextRoomPosition([
+      { posX: 0, width: 5 },
+      { posX: 5.3, width: 3 },
+    ])
     expect(pos).toEqual({ posX: 8.6, posY: 0 })
-  })
-
-  it('offsets each floor into its own row so floors do not overlap in the (floor-unaware) 2D canvas', () => {
-    expect(nextRoomPosition([], 1)).toEqual({ posX: 0, posY: 15 })
-    expect(nextRoomPosition([], -1)).toEqual({ posX: 0, posY: -15 })
   })
 })

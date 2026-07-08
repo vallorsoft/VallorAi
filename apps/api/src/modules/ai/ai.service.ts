@@ -186,6 +186,19 @@ export class AiService {
       })
     }
 
+    // Even when every design_update was already applied (appliedCount 0),
+    // re-derive the generated walls: this is the repair path for a house
+    // whose rooms were applied before wall generation existed — its rooms
+    // are marked applied, so the loop above skips them, but it still has no
+    // walls until this runs. Idempotent, like the rest of this endpoint.
+    const house = await prisma.house.findUnique({
+      where: { projectId },
+      select: { id: true, _count: { select: { rooms: true } } },
+    })
+    if (house && house._count.rooms > 0) {
+      await this.housesService.regenerateGeneratedWalls(house.id, userId)
+    }
+
     return { appliedCount: applied.length, applied }
   }
 
@@ -282,6 +295,7 @@ export class AiService {
           userId,
         )
         await this.housesService.recalculateTotalArea(house.id)
+        await this.housesService.regenerateGeneratedWalls(house.id, userId)
         return { action: 'updated', name: mapped.name, area: updated.area, floor: updated.floor }
       }
     }
@@ -290,7 +304,7 @@ export class AiService {
       where: { houseId: house.id, floor: mapped.floor },
       select: { posX: true, width: true },
     })
-    const { posX, posY } = nextRoomPosition(roomsOnFloor, mapped.floor)
+    const { posX, posY } = nextRoomPosition(roomsOnFloor)
 
     const created = await this.housesService.addRoom(
       house.id,
@@ -298,6 +312,7 @@ export class AiService {
       userId,
     )
     await this.housesService.recalculateTotalArea(house.id)
+    await this.housesService.regenerateGeneratedWalls(house.id, userId)
 
     return { action: 'created', name: mapped.name, area: created.area, floor: created.floor }
   }

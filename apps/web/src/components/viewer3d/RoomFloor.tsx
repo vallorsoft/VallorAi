@@ -19,7 +19,7 @@ const ROOM_COLORS: Record<string, string> = {
   DEFAULT: '#f0f9ff',
 }
 
-export function RoomFloor({ room }: { room: Room }) {
+export function RoomFloor({ room, elevationY = 0 }: { room: Room; elevationY?: number }) {
   const x0 = room.posX ?? 0
   const y0 = room.posY ?? 0
   const width = room.width
@@ -29,7 +29,7 @@ export function RoomFloor({ room }: { room: Room }) {
   if (!Number.isFinite(width) || !Number.isFinite(depth) || width <= 0 || depth <= 0) return null
 
   return (
-    <mesh position={[x0 + width / 2, -FLOOR_RENDER_THICKNESS_M / 2, y0 + depth / 2]}>
+    <mesh position={[x0 + width / 2, elevationY - FLOOR_RENDER_THICKNESS_M / 2, y0 + depth / 2]}>
       <boxGeometry args={[width, FLOOR_RENDER_THICKNESS_M, depth]} />
       <meshStandardMaterial color={color} />
     </mesh>

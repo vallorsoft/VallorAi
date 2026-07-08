@@ -38,15 +38,11 @@ export const DEFAULT_ROOM_HEIGHT_M = 2.7
 // its area (`suggested_area_sqm`) gets *a* rectangle instead of no geometry
 // at all. It is not meant to represent a real floor-plan layout.
 const ROOM_ASPECT_RATIO = 1.3
+// Slightly narrower than the generated walls that will fill it — bim-engine
+// wall-generation clusters room edges within LINE_CLUSTER_TOLERANCE_M
+// (0.45m), so this gap reads as ONE shared partition wall between the two
+// rooms, not as two separate facades with a slit.
 const ROOM_GAP_M = 0.3
-
-// The 2D floor-plan canvas (FloorPlanCanvas.tsx) has no floor filter yet —
-// it draws every room from every floor on the same flat view. Without this,
-// two floors' room rows would both start at (0,0) and visually overlap.
-// Stacking each floor's row well below the previous one keeps them readable
-// as separate rows until the canvas grows real floor switching; it is not a
-// real multi-story layout.
-const FLOOR_ROW_HEIGHT_M = 15
 
 function resolveFloor(raw: unknown): number | null {
   if (typeof raw === 'number' && Number.isFinite(raw)) return Math.round(raw)
@@ -104,15 +100,16 @@ export function roomFromDesignUpdateData(data: Record<string, unknown>): MappedR
  * Lays a new room out next to the existing rooms on the same floor, left to
  * right with a small gap — a simple non-overlapping placeholder placement,
  * not a solved floor plan (see ROOM_ASPECT_RATIO note above). Rooms on other
- * floors don't affect this floor's row, but each floor's row is offset in Y
- * (see FLOOR_ROW_HEIGHT_M) so floors don't overlap in the flat 2D view.
+ * floors don't affect this floor's row. Every floor's row starts at (0,0):
+ * the 2D canvas filters by its floor switcher and the 3D viewer stacks
+ * floors by elevation, so floors are expected to overlap in plan — the old
+ * per-floor Y row offset (FLOOR_ROW_HEIGHT_M, removed together with the
+ * `flatten_room_rows` data migration) would misalign upper floors sideways.
  */
 export function nextRoomPosition(
   existingRoomsOnFloor: Array<{ posX: number; width: number }>,
-  floor: number,
 ): { posX: number; posY: number } {
-  const posY = floor * FLOOR_ROW_HEIGHT_M
-  if (existingRoomsOnFloor.length === 0) return { posX: 0, posY }
+  if (existingRoomsOnFloor.length === 0) return { posX: 0, posY: 0 }
   const rightmost = existingRoomsOnFloor.reduce((max, r) => Math.max(max, r.posX + r.width), 0)
-  return { posX: Math.round((rightmost + ROOM_GAP_M) * 100) / 100, posY }
+  return { posX: Math.round((rightmost + ROOM_GAP_M) * 100) / 100, posY: 0 }
 }

@@ -2,11 +2,22 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Stage, Layer, Rect, Line, Text, Group } from 'react-konva'
+import type Konva from 'konva'
 import { useProjectStore } from '@/store/project.store'
+import { useAddRoom, useAddWall } from '@/hooks/useProjects'
 import { useTranslation } from '@/lib/useTranslation'
 
 const SCALE = 40 // pixels per meter
 const GRID = 1   // grid every 1m
+const ORIGIN_PX = 40 // canvas offset of the plan origin
+/** Drawing snap step, meters — half the visual grid. */
+const SNAP_M = 0.5
+
+// Default footprint for a room placed by hand in the editor (the AI flow
+// sizes rooms from suggested_area_sqm instead) — a starting rectangle the
+// user resizes in RoomPanel, not a spec value.
+const NEW_ROOM_WIDTH_M = 4
+const NEW_ROOM_DEPTH_M = 3
 
 const ROOM_COLORS: Record<string, string> = {
   LIVING_ROOM: '#dbeafe',
@@ -19,16 +30,34 @@ const ROOM_COLORS: Record<string, string> = {
   DEFAULT: '#f0f9ff',
 }
 
+const snap = (m: number) => Math.round(m / SNAP_M) * SNAP_M
+const toWorldM = (px: number) => (px - ORIGIN_PX) / SCALE
+
 export function FloorPlanCanvas() {
-  const { house, selectRoom, selectedRoomId, selectWall, selectedWallId, activeFloor } =
-    useProjectStore()
+  const {
+    house,
+    activeProjectId,
+    selectRoom,
+    selectedRoomId,
+    selectWall,
+    selectedWallId,
+    activeFloor,
+    editorMode,
+    setEditorMode,
+  } = useProjectStore()
   const { t } = useTranslation()
+  const addWall = useAddWall(activeProjectId)
+  const addRoom = useAddRoom(activeProjectId)
   // One level at a time — the toolbar's floor switcher picks which; the 3D
   // view is the one that shows all floors (stacked by elevation).
   const rooms = house?.rooms.filter((room) => room.floor === activeFloor) ?? []
   const walls = house?.walls.filter((wall) => wall.floor === activeFloor) ?? []
   const containerRef = useRef<HTMLDivElement>(null)
   const [{ width, height }, setSize] = useState({ width: 800, height: 600 })
+  // In-progress wall: first click anchors the start, pointer previews the
+  // run, second click commits.
+  const [wallStart, setWallStart] = useState<{ x: number; y: number } | null>(null)
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -44,11 +73,94 @@ export function FloorPlanCanvas() {
     return () => observer.disconnect()
   }, [])
 
+  // Esc cancels the in-progress wall (and leaves the drawing mode).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setWallStart(null)
+      setEditorMode('select')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [setEditorMode])
+
+  // Leaving draw mode drops any half-drawn wall.
+  useEffect(() => {
+    if (editorMode !== 'add-wall') setWallStart(null)
+  }, [editorMode])
+
+  const stagePointer = (e: Konva.KonvaEventObject<MouseEvent | Event>) => {
+    const pos = e.target.getStage()?.getPointerPosition()
+    if (!pos) return null
+    return { x: snap(toWorldM(pos.x)), y: snap(toWorldM(pos.y)) }
+  }
+
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent | Event>) => {
+    if (!house || addWall.isPending || addRoom.isPending) return
+    const point = stagePointer(e)
+    if (!point) return
+
+    if (editorMode === 'add-wall') {
+      if (!wallStart) {
+        setWallStart(point)
+        return
+      }
+      if (point.x === wallStart.x && point.y === wallStart.y) return
+      addWall.mutate({
+        houseId: house.id,
+        startX: wallStart.x,
+        startY: wallStart.y,
+        endX: point.x,
+        endY: point.y,
+        floor: activeFloor,
+      })
+      // Chain: the finished wall's end anchors the next one.
+      setWallStart(point)
+      return
+    }
+
+    if (editorMode === 'add-room') {
+      addRoom.mutate({
+        houseId: house.id,
+        type: 'BEDROOM',
+        name: t.editor.newRoomName,
+        floor: activeFloor,
+        area: NEW_ROOM_WIDTH_M * NEW_ROOM_DEPTH_M,
+        width: NEW_ROOM_WIDTH_M,
+        height: 2.7,
+        posX: point.x,
+        posY: point.y,
+      })
+      setEditorMode('select')
+    }
+  }
+
+  const drawing = editorMode !== 'select'
+  const hint =
+    editorMode === 'add-wall'
+      ? t.editor.wallDrawHint
+      : editorMode === 'add-room'
+        ? t.editor.roomPlaceHint
+        : null
+
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-gray-50 overflow-hidden">
-      <Stage width={width} height={height}>
+    <div
+      ref={containerRef}
+      className={`relative w-full h-full bg-gray-50 overflow-hidden ${drawing ? 'cursor-crosshair' : ''}`}
+    >
+      <Stage
+        width={width}
+        height={height}
+        onClick={drawing ? handleStageClick : undefined}
+        onTap={drawing ? handleStageClick : undefined}
+        onMouseMove={
+          editorMode === 'add-wall' && wallStart
+            ? (e) => setPointer(stagePointer(e))
+            : undefined
+        }
+      >
         {/* Grid layer */}
-        <Layer>
+        <Layer listening={false}>
           {Array.from({ length: Math.ceil(width / (GRID * SCALE)) }).map((_, i) => (
             <Line
               key={`vg${i}`}
@@ -68,10 +180,10 @@ export function FloorPlanCanvas() {
         </Layer>
 
         {/* Rooms layer */}
-        <Layer>
+        <Layer listening={!drawing}>
           {rooms.map((room) => {
-            const x = (room.posX ?? 0) * SCALE + 40
-            const y = (room.posY ?? 0) * SCALE + 40
+            const x = (room.posX ?? 0) * SCALE + ORIGIN_PX
+            const y = (room.posY ?? 0) * SCALE + ORIGIN_PX
             const w = room.width * SCALE
             const h = (room.area / room.width) * SCALE
             const selected = selectedRoomId === room.id
@@ -104,17 +216,17 @@ export function FloorPlanCanvas() {
         </Layer>
 
         {/* Walls layer */}
-        <Layer>
+        <Layer listening={!drawing}>
           {walls.map((wall) => {
             const selected = selectedWallId === wall.id
             return (
               <Line
                 key={wall.id}
                 points={[
-                  wall.startX * SCALE + 40,
-                  wall.startY * SCALE + 40,
-                  wall.endX * SCALE + 40,
-                  wall.endY * SCALE + 40,
+                  wall.startX * SCALE + ORIGIN_PX,
+                  wall.startY * SCALE + ORIGIN_PX,
+                  wall.endX * SCALE + ORIGIN_PX,
+                  wall.endY * SCALE + ORIGIN_PX,
                 ]}
                 stroke={selected ? '#0ea5e9' : '#1e293b'}
                 strokeWidth={wall.thickness ? wall.thickness * SCALE : 4}
@@ -126,7 +238,32 @@ export function FloorPlanCanvas() {
             )
           })}
         </Layer>
+
+        {/* In-progress wall preview */}
+        {editorMode === 'add-wall' && wallStart && (
+          <Layer listening={false}>
+            <Line
+              points={[
+                wallStart.x * SCALE + ORIGIN_PX,
+                wallStart.y * SCALE + ORIGIN_PX,
+                (pointer ?? wallStart).x * SCALE + ORIGIN_PX,
+                (pointer ?? wallStart).y * SCALE + ORIGIN_PX,
+              ]}
+              stroke="#0ea5e9"
+              strokeWidth={0.3 * SCALE}
+              opacity={0.5}
+              lineCap="round"
+              dash={[8, 6]}
+            />
+          </Layer>
+        )}
       </Stage>
+
+      {hint && house && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-gray-900/80 px-3 py-1.5 text-xs text-white pointer-events-none">
+          {hint}
+        </div>
+      )}
 
       {!house && (
         <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">

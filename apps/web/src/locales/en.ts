@@ -101,6 +101,9 @@ export const en = {
     deleteRoom: 'Delete room',
     deletingRoom: 'Deleting...',
     emptyCanvasHint: 'Talk to the AI to generate the house plan',
+    wallDrawHint: 'Click: start point · click again: finish · Esc: cancel',
+    roomPlaceHint: 'Click the plan to place the room',
+    newRoomName: 'New room',
     layerPanel: {
       title: 'Wall assembly',
       selectWallHint: 'Select a wall on the plan',

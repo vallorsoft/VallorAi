@@ -101,6 +101,9 @@ export const hu = {
     deleteRoom: 'Szoba törlése',
     deletingRoom: 'Törlés...',
     emptyCanvasHint: 'Beszélj az AI-val a ház tervének elkészítéséhez',
+    wallDrawHint: 'Kattintás: kezdőpont · újabb kattintás: befejezés · Esc: mégse',
+    roomPlaceHint: 'Kattints a tervre a szoba elhelyezéséhez',
+    newRoomName: 'Új szoba',
     layerPanel: {
       title: 'Fal-szerkezet',
       selectWallHint: 'Válassz ki egy falat a terven',

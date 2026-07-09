@@ -99,6 +99,9 @@ export interface Dictionary {
     deleteRoom: string
     deletingRoom: string
     emptyCanvasHint: string
+    wallDrawHint: string
+    roomPlaceHint: string
+    newRoomName: string
     layerPanel: {
       title: string
       selectWallHint: string

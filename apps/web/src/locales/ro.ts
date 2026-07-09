@@ -101,6 +101,9 @@ export const ro = {
     deleteRoom: 'Șterge camera',
     deletingRoom: 'Se șterge...',
     emptyCanvasHint: 'Vorbește cu AI-ul pentru a genera planul casei',
+    wallDrawHint: 'Clic: punct de pornire · clic din nou: finalizare · Esc: anulare',
+    roomPlaceHint: 'Clic pe plan pentru a așeza camera',
+    newRoomName: 'Cameră nouă',
     layerPanel: {
       title: 'Structura peretelui',
       selectWallHint: 'Selectează un perete pe plan',

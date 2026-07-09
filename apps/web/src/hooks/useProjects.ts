@@ -87,6 +87,53 @@ export async function fetchWallReinforcement(wallId: string): Promise<WallReinfo
   return res.data as WallReinforcementSpec[]
 }
 
+export interface NewWallInput {
+  houseId: string
+  startX: number
+  startY: number
+  endX: number
+  endY: number
+  floor: number
+  isExterior?: boolean
+  isLoad?: boolean
+}
+
+/** Draw a wall in the 2D editor; refreshes the house so the store re-syncs. */
+export function useAddWall(projectId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ houseId, ...data }: NewWallInput) => {
+      const res = await api.post(`/houses/${houseId}/walls`, data)
+      return res.data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['houses', projectId] }),
+  })
+}
+
+export interface NewRoomInput {
+  houseId: string
+  type: string
+  name: string
+  floor: number
+  area: number
+  width: number
+  height: number
+  posX: number
+  posY: number
+}
+
+/** Place a room in the 2D editor; refreshes the house so the store re-syncs. */
+export function useAddRoom(projectId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ houseId, ...data }: NewRoomInput) => {
+      const res = await api.post(`/houses/${houseId}/rooms`, data)
+      return res.data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['houses', projectId] }),
+  })
+}
+
 export interface StructuralReinforcementSpec {
   id: string
   role: 'LONGITUDINAL' | 'STIRRUP' | 'TRANSVERSE'

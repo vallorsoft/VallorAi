@@ -44,6 +44,14 @@ vallorai/
    suggests the site was AI-generated** (no generic "AI tool" clichés — gradient hero banners,
    sparkle icons, boilerplate rounded cards). Audit is tracked but not yet done — see
    "BIM-detail feature" status below.
+10. **Every completed task ships as a merged PR + a durable CLAUDE.md note.** Standing user
+    rule (2026-07-09): when a task is finished — implementation + tests green — the flow is
+    (a) commit on the working branch, (b) open a PR against `main` with a summary and test
+    plan (use `mcp__github__create_pull_request`), (c) merge it (`mcp__github__merge_pull_request`,
+    squash), (d) write a short entry in CLAUDE.md describing what shipped (add to the relevant
+    "Done"/"AI rooms → …" style section or create a new one), so the durable reference stays
+    current. No task is "done" until all four have happened. Don't wait to be asked for the
+    PR / merge / note — do them as part of finishing the task.
 
 ## Running locally
 ```bash

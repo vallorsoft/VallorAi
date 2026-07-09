@@ -135,4 +135,67 @@ describe('Cost engine BOQ integration (e2e)', () => {
     const renderLine = breakdown.find((l) => l.category === 'wall-render')
     expect(renderLine!.quantity).toBeCloseTo(25 - 1.8, 5)
   })
+
+  it('replaces the flat structure rate with real foundation/tie-column/centura/lintel lines', async () => {
+    const res = await request(server)
+      .post(`/api/v1/costs/houses/${houseId}/estimate`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201)
+
+    const breakdown: Array<{
+      category: string
+      name: string
+      quantity: number
+      unit: string
+      priceVerified?: boolean
+    }> = res.body.data.breakdown
+
+    // The flat "structure" guess must be gone, replaced by the real lines.
+    expect(breakdown.some((l) => l.category === 'structure')).toBe(false)
+
+    // Foundation: 10m footing run under the load-bearing wall, no plot ->
+    // fallback frost depth 900mm; width = max(600, 300+2*150) = 600mm.
+    const lean = breakdown.find((l) => l.category === 'foundation' && l.name.includes('C8/10'))
+    expect(lean).toBeDefined()
+    expect(lean!.quantity).toBeCloseTo(10 * 0.6 * 0.1, 5) // 100mm leveling layer
+    const footing = breakdown.find((l) => l.category === 'foundation' && l.name.includes('C16/20'))
+    expect(footing).toBeDefined()
+    expect(footing!.quantity).toBeCloseTo(10 * 0.6 * 0.9, 5)
+    const footingSteel = breakdown.find(
+      (l) => l.category === 'foundation' && l.name.includes('Oțel'),
+    )
+    expect(footingSteel).toBeDefined()
+    expect(footingSteel!.unit).toBe('kg')
+    expect(footingSteel!.quantity).toBeGreaterThan(0)
+
+    // Tie-columns: the 10m run gets 2 mid-span (S2) columns, 250×250mm at
+    // the wall's 2.5m height -> 2 × 0.0625 × 2.5 m³ of C12/15.
+    const tieConcrete = breakdown.find(
+      (l) => l.category === 'tie-column' && l.name.includes('C12/15'),
+    )
+    expect(tieConcrete).toBeDefined()
+    expect(tieConcrete!.quantity).toBeCloseTo(2 * 0.25 * 0.25 * 2.5, 5)
+    const tieSteel = breakdown.find((l) => l.category === 'tie-column' && l.name.includes('Oțel'))
+    expect(tieSteel).toBeDefined()
+    expect(tieSteel!.quantity).toBeGreaterThan(0)
+
+    // Centuri: the exterior wall carries one at its own level plus the
+    // above-top-floor one; height 2×130mm (exterior), width = 300mm wall ->
+    // 2 × 10 × 0.3 × 0.26 m³.
+    const centuraConcrete = breakdown.find(
+      (l) => l.category === 'centura' && l.name.includes('C12/15'),
+    )
+    expect(centuraConcrete).toBeDefined()
+    expect(centuraConcrete!.quantity).toBeCloseTo(2 * 10 * 0.3 * 0.26, 5)
+    const centuraSteel = breakdown.find((l) => l.category === 'centura' && l.name.includes('Oțel'))
+    expect(centuraSteel).toBeDefined()
+    expect(centuraSteel!.quantity).toBeGreaterThan(0)
+
+    // Lintel: one prefabricated unit for the window added above.
+    const lintel = breakdown.find((l) => l.category === 'lintel')
+    expect(lintel).toBeDefined()
+    expect(lintel!.name).toBe('Buiandrug prefabricat')
+    expect(lintel!.quantity).toBe(1)
+    expect(lintel!.priceVerified).toBe(false)
+  })
 })

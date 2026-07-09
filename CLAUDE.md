@@ -743,11 +743,60 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
   Browser-verified on a seeded C25/30 wall (Ø12 @ 150mm, 25mm cover — SR 438-1-range values):
   overlay reports the 2 computed bars, wall translucency confirmed visually.
 
-### Next (Step 9, not started)
+- **Step 9 — Stirrup / kengyer / etriers instancing**: the bent closed-loop transverse
+  reinforcement for the confining elements Modules 2/3 already ship — the last of the
+  BIM-detail sequence. At the `detail` LOD tier the 3D viewer now draws stirrups alongside
+  the longitudinal bars (Step 8) and brick coursing (Steps 6/7). Every number comes from the
+  STIRRUP-role `ReinforcementSpec` rows already seeded by CR6-2013 Modules 2 (tie-columns:
+  Ø6 @ 150mm, 25mm cover) and 3 (centuri: same); no invented structural defaults.
+  - `packages/bim-engine/src/stirrup.ts` (unit-tested): pure element-agnostic layout —
+    `generateStirrupLayout(element, spec)` returns one `StirrupLoop` per stirrup, positioned
+    at `spec.coverMm + i * spec.spacingMm` from the near end, with cross-section half-extents
+    `crossSection/2 - cover - Ø/2` on each axis. `calculateStirrupCount` and
+    `calculateStirrupQuantity` (perimeter × loop count, weight from steel density) for the
+    cost-engine side. **Not modeled** (deliberately, no primary citation for either): CR6-
+    2013's tighter end-zone stirrup spacing (a per-drawing detailing refinement) and hook /
+    overlap length per SR EN 1992-1-1 §8.5 — flagged in the module doc as gaps.
+  - `packages/bim-engine/src/stirrup-instancing.ts` (unit-tested):
+    `composeStirrupInstanceMatrices(frame, loops)` emits 4 world-space matrices per loop (the
+    4 sides of the rectangular stirrup, drawn edge-to-edge as straight bar segments — no
+    curved torus geometry) over the same unit cylinder `rebar-instancing.ts` uses. Two
+    convenience wrappers pick the frame automatically:
+    `generateTieColumnStirrupInstances` (vertical column at plan (posX, posZ), Y up) and
+    `generateCenturaStirrupInstances` (horizontal ring beam along a wall, longAxis = wall
+    direction, one cross axis vertical, the other across wall thickness).
+  - Web: `apps/web/src/components/viewer3d/useStirrupInstances.ts` fetches every tie-column
+    + centură via the existing `GET /houses/:id/tie-columns` and `GET /houses/:id/centuri`
+    endpoints (their responses already include the `STIRRUP`-role reinforcement rows) and
+    composes matrices on the main thread — the total loop count for an ordinary house is in
+    the low hundreds, well below the worker threshold the brick path needs. Pools by floor,
+    same layout as the rebar pools; centuri key by `level` so the extra above-top-floor
+    centură renders one storey higher than its host wall. `StirrupInstances.tsx` renders one
+    `InstancedMesh` per pool in a slightly-lighter steel gray than the longitudinal bars (so
+    a close-up mixed view stays legible). `HouseScene` wires it in under the existing rebar
+    LOD-gate; a new `viewer3d.stirrupCountLabel` overlay counter joins the bricks/bars
+    counters (all 3 locales — etrieri / kengyerek / stirrups).
+  - Coverage: 8 new unit tests in `stirrup.spec.ts` / `stirrup-instancing.spec.ts` (loop
+    count, half-extent math for tie-column and centură cross-sections, empty layouts for
+    too-thin cross-sections and cover-buried elements, perimeter/weight quantity, non-
+    STIRRUP-role and zero-length early-outs, unit-cylinder matrix scale/orientation on both
+    vertical and horizontal orientations). 2 new API e2e cases in
+    `apps/api/test/stirrup.e2e-spec.ts` end-to-end: `GET /houses/:id/tie-columns` returns
+    the STIRRUP spec → composer produces 4 segments × 18 loops (2.7m storey) per S1 column,
+    and `GET /houses/:id/centuri` drives the horizontal 5m-centura layout to 34 loops × 4
+    segments.
+  - Not yet done: no UI panel surfaces the STIRRUP spec next to the LONGITUDINAL one (same
+    "no reinforcement panel yet" gap the confined-masonry entry documents for S1/S2/S3); no
+    cost-engine BOQ line for stirrups (the calc `calculateStirrupQuantity` is ready, the
+    caller in `costs.service.ts` is not).
 
-9. **Stirrup/bent rebar** — needs both a new `bim-engine` calc function (stirrups are a bent
-   closed loop, not a straight bar — geometrically distinct from longitudinal rebar) and a
-   separate instance pool/geometry in the 3D viewer.
+### Next
+
+- Reinforcement panel UI (LONGITUDINAL + STIRRUP + TRANSVERSE) for foundations, tie-columns,
+  centuri, and any user-reinforced walls — the API already returns the data, no viewer yet.
+- Cost-engine BOQ for structural rebar (feed `calculateLongitudinalRebarQuantity` +
+  `calculateStirrupQuantity` into `costs.service.ts` alongside the existing wall-assembly
+  path) and for roofing (see the roof section above's "no BOQ line for roofing yet" note).
 
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable

@@ -205,6 +205,25 @@ async function main() {
       },
     },
     {
+      category: 'ROOFING',
+      name: 'Țiglă ceramică Tondach standard',
+      standardRef: 'Wienerberger RO / Tondach product line — SR EN 1304',
+      unit: 'M2',
+      unitCostRON: 65,
+      specSheet: {
+        materialType: 'ceramic tile',
+        minPitchDegSheathing: 30,
+        typicalPitchRangeDeg: [30, 45],
+        piecesPerM2Approx: 14,
+        // NP 057-2002 explicitly names 30° as the snow-retention threshold;
+        // Tondach's standard tile lines are cross-checked at 30° minimum
+        // with continuous sheathing (astereală continuă).
+        snowRetentionRequiredAbovePitchDeg: 30,
+        priceVerified: false,
+        priceSource: 'Estimate pending manufacturer quote — real price varies by profile',
+      },
+    },
+    {
       category: 'PAINT',
       name: 'Vopsea lavabilă interior',
       standardRef: null,

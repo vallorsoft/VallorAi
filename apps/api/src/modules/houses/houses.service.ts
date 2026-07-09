@@ -10,6 +10,9 @@ import {
   deriveLintelSpec,
   deriveCenturaLevels,
   deriveCenturaReinforcement,
+  solveFloorPlan,
+  generateOpenings,
+  deriveRoofSpec,
   CENTURA_CONCRETE_CLASS,
   TIE_COLUMN_CROSS_SECTION_MM,
   TIE_COLUMN_CONCRETE_CLASS,
@@ -17,6 +20,8 @@ import {
   type WallSegment,
   type WallOpeningForConfinement,
   type CenturaWallSegment,
+  type RoofType,
+  type SolvedRoomFootprint,
 } from '@ai-home-designer/bim-engine'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
@@ -66,15 +71,16 @@ export class HousesService {
 
   async removeRoom(roomId: string, userId: string) {
     const room = await prisma.room.delete({ where: { id: roomId } })
-    // Keep auto-generated walls in step with the rooms they were derived
-    // from (e.g. deleting the stale duplicate an UPDATE_ROOM type-drift can
-    // leave behind). Houses without generated walls are left untouched.
+    // Keep auto-generated walls + openings + roof in step with the rooms they
+    // were derived from (e.g. deleting the stale duplicate an UPDATE_ROOM
+    // type-drift can leave behind). Houses without generated walls are left
+    // untouched — a purely user-drawn house isn't the solver's business.
     const hasGenerated = await prisma.wall.findFirst({
       where: { houseId: room.houseId, isGenerated: true },
       select: { id: true },
     })
     if (hasGenerated) {
-      await this.regenerateGeneratedWalls(room.houseId, userId)
+      await this.solveAndRegenerate(room.houseId, userId)
     } else {
       await this.projectVersions.snapshotHouse(room.houseId, userId)
     }
@@ -116,6 +122,12 @@ export class HousesService {
    * have real geometry to work from. Layer stacks on the deleted walls
    * cascade away and re-provision lazily on next access (getWallLayers), so
    * regenerated walls keep picking up the default assemblies.
+   *
+   * Callers who need to place openings on the freshly-created walls should
+   * use `solveAndRegenerate` instead — it also (re-)solves the room layout,
+   * generates openings on the new walls, and provisions the roof; this
+   * primitive only regenerates walls and is kept for callers (tests, admin
+   * repair) that specifically want that.
    */
   async regenerateGeneratedWalls(houseId: string, userId: string) {
     const rooms = await prisma.room.findMany({ where: { houseId } })
@@ -150,6 +162,204 @@ export class HousesService {
     ])
     await this.projectVersions.snapshotHouse(houseId, userId)
     return { wallCount: segments.length }
+  }
+
+  /**
+   * The main "the AI chat changed something about the house" entry point:
+   *   1. Re-solves every room's position from the current room list
+   *      (bim-engine floor-plan solver) so the house reads as a coherent
+   *      footprint instead of a strip of boxes;
+   *   2. Persists the new positions/dimensions to the Room rows;
+   *   3. Regenerates the generated walls around the newly-positioned rooms
+   *      (delete-and-recreate, same as regenerateGeneratedWalls) — this
+   *      cascades openings on those walls away too;
+   *   4. Generates a fresh opening set (interior doors, exterior windows,
+   *      one entry door on the ground floor) on the just-created walls
+   *      (bim-engine openings-generation);
+   *   5. Auto-provisions the Roof row if not present, else recomputes the
+   *      ridge from the new footprint.
+   *
+   * User-drawn walls (isGenerated=false) and their openings are untouched,
+   * mirroring the pre-existing wall-regen behavior. All five steps are one
+   * top-level DB write plus a project-version snapshot at the end.
+   */
+  async solveAndRegenerate(houseId: string, userId: string) {
+    const rooms = await prisma.room.findMany({ where: { houseId } })
+    if (rooms.length === 0) return { wallCount: 0, openingCount: 0, roomCount: 0 }
+
+    const solved = solveFloorPlan(
+      rooms.map((r) => ({ id: r.id, type: r.type, floor: r.floor, area: r.area })),
+    )
+    const solvedById = new Map(solved.map((s) => [s.id, s]))
+
+    // Room-updates → wall-delete → wall-create → opening-create in one
+    // interactive transaction so a mid-run failure doesn't leave a partial
+    // house (e.g. walls with no openings, or vice-versa). Roof provisioning
+    // reads the just-committed walls so it stays outside this transaction.
+    const footprints: RoomFootprint[] = solved.map((s) => ({
+      id: s.id,
+      floor: s.floor,
+      posX: s.posX,
+      posY: s.posY,
+      widthM: s.widthM,
+      depthM: s.depthM,
+    }))
+    const segments = deriveWallsFromRooms(footprints)
+    const solvedFootprints: SolvedRoomFootprint[] = solved.map((s) => ({
+      id: s.id,
+      type: rooms.find((r) => r.id === s.id)!.type,
+      floor: s.floor,
+      posX: s.posX,
+      posY: s.posY,
+      widthM: s.widthM,
+      depthM: s.depthM,
+    }))
+    const openings = generateOpenings(segments, solvedFootprints)
+
+    const result = await prisma.$transaction(
+      async (tx) => {
+        for (const room of rooms) {
+          const s = solvedById.get(room.id)
+          if (!s) continue
+          await tx.room.update({
+            where: { id: room.id },
+            data: {
+              posX: s.posX,
+              posY: s.posY,
+              width: s.widthM,
+              area: Math.round(s.widthM * s.depthM * 100) / 100,
+            },
+          })
+        }
+        await tx.wall.deleteMany({ where: { houseId, isGenerated: true } })
+        // Individual create()s so we get IDs back in the same order as
+        // `segments` — createMany doesn't return rows, and openings need the
+        // fresh wall IDs.
+        const createdWalls: { id: string }[] = []
+        for (const s of segments) {
+          const wall = await tx.wall.create({
+            data: {
+              houseId,
+              floor: s.floor,
+              startX: s.startX,
+              startY: s.startY,
+              endX: s.endX,
+              endY: s.endY,
+              thickness: s.thicknessM,
+              isLoad: s.isLoadBearing,
+              isExterior: s.isExterior,
+              isGenerated: true,
+            },
+            select: { id: true },
+          })
+          createdWalls.push(wall)
+        }
+
+        let openingCount = 0
+        for (const o of openings) {
+          const wall = createdWalls[o.wallIndex]
+          if (!wall) continue
+          await tx.opening.create({
+            data: {
+              houseId,
+              wallId: wall.id,
+              type: o.type,
+              position: o.position,
+              width: o.widthM,
+              height: o.heightM,
+              sillHeight: o.sillHeightM,
+            },
+          })
+          openingCount++
+        }
+        return { wallCount: createdWalls.length, openingCount }
+      },
+      { timeout: 15000 },
+    )
+
+    // Roof: auto-provision on first pass, otherwise refresh ridge from the
+    // new footprint (keep user-changed type/pitch/overhang — a UI to edit
+    // those doesn't exist yet, but the persistence shape is prepared).
+    await this.provisionOrRefreshRoof(houseId)
+
+    await this.projectVersions.snapshotHouse(houseId, userId)
+    return { ...result, roomCount: rooms.length }
+  }
+
+  private async provisionOrRefreshRoof(houseId: string) {
+    const house = await prisma.house.findUniqueOrThrow({
+      where: { id: houseId },
+      include: { walls: true, roof: true },
+    })
+    const topFloor = house.walls.reduce((max, w) => Math.max(max, w.floor), 0)
+    const topWalls = house.walls.filter((w) => w.floor === topFloor && w.isExterior)
+    if (topWalls.length === 0) return null
+
+    // Envelope from the topmost floor's exterior walls.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const w of topWalls) {
+      minX = Math.min(minX, w.startX, w.endX)
+      minY = Math.min(minY, w.startY, w.endY)
+      maxX = Math.max(maxX, w.startX, w.endX)
+      maxY = Math.max(maxY, w.startY, w.endY)
+    }
+    const lengthM = Math.max(maxX - minX, maxY - minY)
+    const widthM = Math.min(maxX - minX, maxY - minY)
+    if (lengthM <= 0 || widthM <= 0) return null
+
+    const existingType = (house.roof?.type as RoofType) ?? (house.roofType as RoofType) ?? 'GABLED'
+    const validType: RoofType = ['GABLED', 'HIPPED', 'FLAT', 'MONOSLOPE'].includes(existingType)
+      ? existingType
+      : 'GABLED'
+    const spec = deriveRoofSpec(validType, { lengthM, widthM })
+
+    if (house.roof) {
+      return prisma.roof.update({
+        where: { houseId },
+        data: {
+          type: spec.type,
+          pitchDeg: house.roof.pitchDeg,  // preserve user-chosen values on refresh
+          overhangM: house.roof.overhangM,
+          ridgeHeightM: spec.ridgeHeightM,
+          pitchVerified: house.roof.pitchVerified,
+          overhangVerified: house.roof.overhangVerified,
+        },
+      })
+    }
+    const roofingMaterial = await prisma.material.findFirstOrThrow({
+      where: { name: 'Țiglă ceramică Tondach standard', source: 'GENERIC_DEFAULT' },
+    })
+    return prisma.roof.create({
+      data: {
+        houseId,
+        type: spec.type,
+        pitchDeg: spec.pitchDeg,
+        overhangM: spec.overhangM,
+        ridgeHeightM: spec.ridgeHeightM,
+        pitchVerified: spec.pitchVerified,
+        overhangVerified: spec.overhangVerified,
+        materialId: roofingMaterial.id,
+      },
+    })
+  }
+
+  /**
+   * The house's roof — auto-provisioned via provisionOrRefreshRoof on first
+   * access if no row exists yet, mirroring getFoundation. Refreshed via
+   * solveAndRegenerate whenever rooms change so the ridge follows the
+   * footprint automatically.
+   */
+  async getRoof(houseId: string) {
+    const existing = await prisma.roof.findUnique({
+      where: { houseId },
+      include: { material: true },
+    })
+    if (existing) return existing
+    await this.provisionOrRefreshRoof(houseId)
+    return prisma.roof.findUnique({
+      where: { houseId },
+      include: { material: true },
+    })
   }
 
   async recalculateTotalArea(houseId: string) {

@@ -29,21 +29,24 @@ export const hu = {
     ctaSecondary: 'Már van fiókod? Lépj be',
     features: [
       {
-        icon: '🏠',
         title: 'AI tervgenerálás',
         desc: 'Írd le egyszerű szavakkal, mit szeretnél, és az AI pár perc alatt elkészíti a tervet.',
       },
       {
-        icon: '📐',
         title: '2D/3D szerkesztő',
         desc: 'Módosítsd a tervet interaktívan a vizuális szerkesztőnkkel, adj hozzá szobákat és falakat.',
       },
       {
-        icon: '⚖️',
         title: 'Román előírások',
         desc: 'Automatikus ellenőrzés a P100, NP 011 szabványok és a helyi előírások szerint.',
       },
     ],
+    sketchRooms: {
+      living: 'Nappali',
+      bedroom: 'Hálószoba',
+      kitchen: 'Konyha',
+      bath: 'Fürdő',
+    },
     footerTagline: 'Romániának tervezve',
   },
   projectsPage: {

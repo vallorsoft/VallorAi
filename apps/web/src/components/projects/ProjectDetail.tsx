@@ -1,5 +1,6 @@
 'use client'
 
+import { Calculator, FileOutput, Scale } from 'lucide-react'
 import Link from 'next/link'
 import { useProject } from '@/hooks/useProjects'
 import { AiChat } from '@/components/ai/AiChat'
@@ -73,16 +74,16 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
             <h3 className="font-medium text-sm text-gray-700 mb-3">{t.projectDetail.quickActionsTitle}</h3>
             <div className="space-y-2">
               {[
-                { label: t.projectDetail.actionValidateRules, icon: '⚖️', href: '#' },
-                { label: t.projectDetail.actionEstimateCost, icon: '💰', href: '#' },
-                { label: t.projectDetail.actionExportDxf, icon: '📐', href: '#' },
+                { label: t.projectDetail.actionValidateRules, Icon: Scale, href: '#' },
+                { label: t.projectDetail.actionEstimateCost, Icon: Calculator, href: '#' },
+                { label: t.projectDetail.actionExportDxf, Icon: FileOutput, href: '#' },
               ].map((a) => (
                 <a
                   key={a.label}
                   href={a.href}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm text-gray-700 transition-colors"
                 >
-                  <span>{a.icon}</span>
+                  <a.Icon className="w-4 h-4 text-gray-500" />
                   {a.label}
                 </a>
               ))}

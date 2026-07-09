@@ -41,7 +41,13 @@ export interface Dictionary {
     heroSubtitle: string
     ctaPrimary: string
     ctaSecondary: string
-    features: { icon: string; title: string; desc: string }[]
+    features: { title: string; desc: string }[]
+    sketchRooms: {
+      living: string
+      bedroom: string
+      kitchen: string
+      bath: string
+    }
     footerTagline: string
   }
   projectsPage: {

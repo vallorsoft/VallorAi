@@ -1,5 +1,6 @@
 'use client'
 
+import { MessagesSquare } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
@@ -87,7 +88,7 @@ export function AiChat({ projectId }: AiChatProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && !sending && (
           <div className="text-center text-gray-400 text-sm py-8">
-            <div className="text-3xl mb-2">👋</div>
+            <MessagesSquare className="w-7 h-7 mx-auto mb-3 text-brand-400" />
             <p>{t.aiChat.greeting1}</p>
             <p className="mt-1">{t.aiChat.greeting2}</p>
           </div>

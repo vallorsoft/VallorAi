@@ -29,21 +29,24 @@ export const en = {
     ctaSecondary: 'Already have an account? Sign in',
     features: [
       {
-        icon: '🏠',
         title: 'AI plan generation',
         desc: 'Describe what you want in simple words and the AI creates the plan in minutes.',
       },
       {
-        icon: '📐',
         title: '2D/3D editor',
         desc: 'Edit the plan interactively with our visual editor, add rooms and walls.',
       },
       {
-        icon: '⚖️',
         title: 'Romanian regulations',
         desc: 'Automatic validation against P100, NP 011 standards and local rules.',
       },
     ],
+    sketchRooms: {
+      living: 'Living room',
+      bedroom: 'Bedroom',
+      kitchen: 'Kitchen',
+      bath: 'Bathroom',
+    },
     footerTagline: 'Designed for Romania',
   },
   projectsPage: {

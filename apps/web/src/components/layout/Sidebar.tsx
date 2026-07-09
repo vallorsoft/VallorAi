@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Home, LogOut, Settings, ShieldCheck, Store } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from '@/lib/useTranslation'
@@ -20,11 +21,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { data: currentUser } = useCurrentUser()
 
   const navItems = [
-    { href: '/projects', label: t.sidebar.projects, icon: '🏠' },
-    { href: '/marketplace', label: t.sidebar.marketplace, icon: '🛒' },
-    { href: '/settings', label: t.sidebar.settings, icon: '⚙️' },
+    { href: '/projects', label: t.sidebar.projects, Icon: Home },
+    { href: '/marketplace', label: t.sidebar.marketplace, Icon: Store },
+    { href: '/settings', label: t.sidebar.settings, Icon: Settings },
     ...(currentUser?.role === 'SUPERADMIN'
-      ? [{ href: '/admin/ai-settings', label: t.adminAiSettings.title, icon: '' }]
+      ? [{ href: '/admin/ai-settings', label: t.adminAiSettings.title, Icon: ShieldCheck }]
       : []),
   ]
 
@@ -80,7 +81,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
-                <span>{item.icon}</span>
+                <item.Icon className="w-4 h-4 shrink-0" />
                 {item.label}
               </Link>
             )
@@ -92,7 +93,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
           >
-            <span>🚪</span>
+            <LogOut className="w-4 h-4 shrink-0" />
             {t.sidebar.logout}
           </button>
         </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { Home } from 'lucide-react'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useProjects, useCreateProject } from '@/hooks/useProjects'
@@ -48,7 +49,7 @@ export function ProjectsGrid() {
           <Link key={p.id} href={`/projects/${p.id}`}>
             <div className="bg-white rounded-xl border border-gray-100 p-5 h-40 flex flex-col hover:shadow-md transition-shadow cursor-pointer">
               <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center text-xl">🏠</div>
+                <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center"><Home className="w-5 h-5 text-brand-600" /></div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(p.status)}`}>
                   {statusLabel(p.status, t)}
                 </span>

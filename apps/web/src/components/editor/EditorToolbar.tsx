@@ -1,5 +1,6 @@
 'use client'
 
+import { MousePointer2, PenLine, Square } from 'lucide-react'
 import { useProjectStore } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
 import type { Dictionary } from '@/locales'
@@ -16,9 +17,9 @@ export function EditorToolbar() {
     useProjectStore()
 
   const tools = [
-    { mode: 'select' as const, label: t.editor.toolSelect, icon: '↖' },
-    { mode: 'add-room' as const, label: t.editor.toolAddRoom, icon: '⬜' },
-    { mode: 'add-wall' as const, label: t.editor.toolAddWall, icon: '—' },
+    { mode: 'select' as const, label: t.editor.toolSelect, Icon: MousePointer2 },
+    { mode: 'add-room' as const, label: t.editor.toolAddRoom, Icon: Square },
+    { mode: 'add-wall' as const, label: t.editor.toolAddWall, Icon: PenLine },
   ]
 
   const views = [
@@ -41,13 +42,13 @@ export function EditorToolbar() {
             key={tool.mode}
             onClick={() => setEditorMode(tool.mode)}
             title={tool.label}
-            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               editorMode === tool.mode
                 ? 'bg-brand-500 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <span className="mr-1.5">{tool.icon}</span>
+            <tool.Icon className="w-3.5 h-3.5" />
             {tool.label}
           </button>
         ))}

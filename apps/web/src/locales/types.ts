@@ -116,6 +116,31 @@ export interface Dictionary {
         PAINT: string
       }
     }
+    structuralPanel: {
+      title: string
+      loading: string
+      foundationTitle: string
+      depthLabel: string
+      widthLabel: string
+      concreteLabel: string
+      leanConcreteLabel: string
+      reinforcementLabel: string
+      transverseLabel: string
+      longitudinalLabel: string
+      stirrupLabel: string
+      coverLabel: string
+      depthUnverifiedNotice: string
+      tieColumnsTitle: string
+      crossSectionLabel: string
+      categoryS1: string
+      categoryS2: string
+      categoryS3: string
+      centuriTitle: string
+      countLabel: string
+      heightLabel: string
+      perWallNote: string
+      engineerNotice: string
+    }
     viewer3d: {
       lodLabel: string
       masonryComputing: string

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { EditorToolbar } from './EditorToolbar'
 import { RoomPanel } from './RoomPanel'
+import { StructuralPanel } from './StructuralPanel'
 import { WallLayerPanel } from './WallLayerPanel'
 import { Viewer3D } from '@/components/viewer3d/Viewer3D'
 import { AiChat } from '@/components/ai/AiChat'
@@ -92,7 +93,14 @@ export function EditorLayout({ projectId }: { projectId: string }) {
               {selectedWallId ? t.editor.layerPanel.title : t.editor.propertiesTitle}
             </h3>
           </div>
-          {selectedWallId ? <WallLayerPanel /> : <RoomPanel projectId={projectId} />}
+          {selectedWallId ? (
+            <WallLayerPanel />
+          ) : (
+            <>
+              <RoomPanel projectId={projectId} />
+              <StructuralPanel />
+            </>
+          )}
         </div>
       </div>
     </div>

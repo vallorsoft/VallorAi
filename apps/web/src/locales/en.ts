@@ -124,6 +124,7 @@ export const en = {
       masonryComputing: 'Generating masonry…',
       brickCountLabel: 'Bricks',
       rebarCountLabel: 'Rebar bars',
+      stirrupCountLabel: 'Stirrups',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Hardware acceleration unavailable — masonry detail is disabled to keep the view smooth',
     },

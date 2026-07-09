@@ -13,6 +13,8 @@ import { BrickInstances } from './BrickInstances'
 import { useBrickInstances } from './useBrickInstances'
 import { RebarInstances } from './RebarInstances'
 import { useRebarInstances } from './useRebarInstances'
+import { StirrupInstances } from './StirrupInstances'
+import { useStirrupInstances } from './useStirrupInstances'
 import { useLOD } from './useLOD'
 
 /**
@@ -104,6 +106,8 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const showBricks = lodTier === 'detail' && !computing && pools.length > 0
   const rebar = useRebarInstances(house, lodTier === 'detail')
   const showRebar = lodTier === 'detail' && !rebar.computing && rebar.pools.length > 0
+  const stirrup = useStirrupInstances(house, lodTier === 'detail')
+  const showStirrup = lodTier === 'detail' && !stirrup.computing && stirrup.pools.length > 0
   const { data: roof } = useRoof(house.id)
   const roofFootprint = useRoofFootprint(house)
 
@@ -141,6 +145,12 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <RebarInstances pool={pool} />
           </group>
         ))}
+      {showStirrup &&
+        stirrup.pools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.floor)}>
+            <StirrupInstances pool={pool} />
+          </group>
+        ))}
       {roof && roofFootprint && (
         <RoofMesh
           roof={roof}
@@ -168,6 +178,12 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <>
               {' '}
               · {t.editor.viewer3d.rebarCountLabel}: {rebar.totalBars.toLocaleString()}
+            </>
+          )}
+          {showStirrup && stirrup.totalLoops > 0 && (
+            <>
+              {' '}
+              · {t.editor.viewer3d.stirrupCountLabel}: {stirrup.totalLoops.toLocaleString()}
             </>
           )}
           {lowPerfMode && (

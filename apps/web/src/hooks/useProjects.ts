@@ -134,6 +134,36 @@ export function useAddRoom(projectId: string | null) {
   })
 }
 
+export interface NewOpeningInput {
+  houseId: string
+  wallId: string
+  type: 'DOOR' | 'WINDOW'
+  position: number
+  width: number
+  height: number
+  sillHeight: number
+}
+
+/** Add a door/window to a wall; refreshes the house so plan + 3D re-sync. */
+export function useAddOpening(projectId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ houseId, ...data }: NewOpeningInput) => {
+      const res = await api.post(`/houses/${houseId}/openings`, data)
+      return res.data
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['houses', projectId] }),
+  })
+}
+
+export function useDeleteOpening(projectId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (openingId: string) => api.delete(`/houses/openings/${openingId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['houses', projectId] }),
+  })
+}
+
 export interface StructuralReinforcementSpec {
   id: string
   role: 'LONGITUDINAL' | 'STIRRUP' | 'TRANSVERSE'

@@ -3,11 +3,13 @@
 import { useProjectStore } from '@/store/project.store'
 import { useWallLayers } from '@/hooks/useProjects'
 import { useTranslation } from '@/lib/useTranslation'
+import { OpeningsPanel } from './OpeningsPanel'
 
 export function WallLayerPanel() {
-  const { selectedWallId } = useProjectStore()
+  const { selectedWallId, house } = useProjectStore()
   const { t } = useTranslation()
   const { data: layers, isLoading } = useWallLayers(selectedWallId)
+  const wall = house?.walls.find((w) => w.id === selectedWallId)
 
   if (!selectedWallId) {
     return (
@@ -56,6 +58,8 @@ export function WallLayerPanel() {
           {t.editor.layerPanel.priceUnverifiedNotice}
         </p>
       )}
+
+      {wall && <OpeningsPanel wall={wall} />}
     </div>
   )
 }

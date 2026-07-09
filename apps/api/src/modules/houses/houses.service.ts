@@ -106,6 +106,13 @@ export class HousesService {
     return opening
   }
 
+  async removeOpening(openingId: string, userId: string) {
+    // The opening's Lintel (1:1) cascades with the row.
+    const opening = await prisma.opening.delete({ where: { id: openingId } })
+    await this.projectVersions.snapshotHouse(opening.houseId, userId)
+    return opening
+  }
+
   /**
    * Re-derives the house's auto-generated wall set from its current room
    * rectangles (bim-engine wall-generation): deletes every wall previously

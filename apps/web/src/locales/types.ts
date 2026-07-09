@@ -119,6 +119,23 @@ export interface Dictionary {
         PAINT: string
       }
     }
+    openingsPanel: {
+      title: string
+      empty: string
+      typeDoor: string
+      typeWindow: string
+      widthLabel: string
+      heightLabel: string
+      positionLabel: string
+      sillLabel: string
+      addDoor: string
+      addWindow: string
+      adding: string
+      deleteLabel: string
+      lintelLabel: string
+      lintelBearingNote: string
+      positionError: string
+    }
     structuralPanel: {
       title: string
       loading: string

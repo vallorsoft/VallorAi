@@ -71,6 +71,11 @@ export class HousesController {
     return this.housesService.addOpening(houseId, wallId, data as never, req.user.id)
   }
 
+  @Delete('openings/:id')
+  removeOpening(@Param('id') openingId: string, @Request() req: { user: { id: string } }) {
+    return this.housesService.removeOpening(openingId, req.user.id)
+  }
+
   @Get('walls/:id/layers')
   getWallLayers(@Param('id') wallId: string) {
     return this.housesService.getWallLayers(wallId)

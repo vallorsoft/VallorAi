@@ -89,9 +89,13 @@ export function WallMesh({
     }
   }, [wall])
 
+  // Openings become real holes at every LOD tier (detail mortar-core mode
+  // already did; abstract-box mode now does too), so an AI-designed house
+  // shows its doors and windows the moment it appears on screen instead of
+  // reading as a sealed brick block until the user zooms in.
   const patches = useMemo(
-    () => (mortarCoreWidthM !== undefined ? subtractOpenings(length, wall.height, openings) : []),
-    [mortarCoreWidthM, length, wall.height, openings],
+    () => subtractOpenings(length, wall.height, openings),
+    [length, wall.height, openings],
   )
 
   if (length === 0) return null
@@ -121,15 +125,23 @@ export function WallMesh({
     )
   }
 
+  const color = wall.isExterior ? EXTERIOR_COLOR : INTERIOR_COLOR
   return (
-    <mesh position={[centerX, elevationY + wall.height / 2, centerZ]} rotation={[0, rotationY, 0]}>
-      <boxGeometry args={[length, wall.height, wall.thickness]} />
-      <meshStandardMaterial
-        color={wall.isExterior ? EXTERIOR_COLOR : INTERIOR_COLOR}
-        transparent={translucent}
-        opacity={translucent ? 0.35 : 1}
-        depthWrite={!translucent}
-      />
-    </mesh>
+    <group position={[centerX, elevationY, centerZ]} rotation={[0, rotationY, 0]}>
+      {patches.map((p, i) => (
+        <mesh
+          key={i}
+          position={[(p.u0 + p.u1) / 2 - length / 2, (p.y0 + p.y1) / 2, 0]}
+        >
+          <boxGeometry args={[p.u1 - p.u0, p.y1 - p.y0, wall.thickness]} />
+          <meshStandardMaterial
+            color={color}
+            transparent={translucent}
+            opacity={translucent ? 0.35 : 1}
+            depthWrite={!translucent}
+          />
+        </mesh>
+      ))}
+    </group>
   )
 }

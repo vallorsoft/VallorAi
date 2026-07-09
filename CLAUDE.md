@@ -168,11 +168,112 @@ floors splayed side by side):
   pool to `floor * LEVEL_HEIGHT_M` (2.7m — a rendering constant matching `Wall.height`'s
   default, not a storey-height spec; there is still no slab/storey model).
 
-Still open: the manual "Adaugă perete" toolbar mode isn't wired to the API; the AI's `ADD_WALL`
-action remains unhandled (never observed to carry usable geometry); no doors/windows are
-generated (an AI-designed house's walls have no openings until added via the API), and
-regenerating drops openings that were manually added to a *generated* wall (they cascade with
-the wall row — put openings on manual walls, or re-add them once the room plan settles).
+### AI rooms → coherent floor-plan + auto-openings + roof (added 2026-07-09)
+
+Before this change, an AI-designed house looked like disconnected rectangles in a row plus a
+few more stacked on top — a real user complaint: "the system doesn't build a house, just
+boxes next to and on top of each other." Confirmed against the code: every room got a 1.3:1
+placeholder rectangle (`ROOM_ASPECT_RATIO` in `design-update-mapper.ts`) placed to the right
+of the previous one (`nextRoomPosition`), there was no roof at all (`House.roofType` was a
+label with no geometry), and no doors/windows anywhere. Three new modules close all three
+gaps together — an AI-designed house now reads as an actual house in 2D and 3D.
+
+- **Floor-plan solver**: `packages/bim-engine/src/floor-plan.ts` (unit-tested). Functional-
+  zone-aware slice-and-dice partition, per **NP 057-2002** (Normativ privind proiectarea
+  clădirilor de locuinţe, MLPTL Order 1383/24.09.2002 — the RO residential-design normativ
+  that explicitly addresses "Orientarea față de punctele cardinale"). Rooms are grouped into
+  PUBLIC / PRIVATE / SERVICE / CIRCULATION / EXTERIOR zones by case-insensitive keyword match
+  against a small RO/EN/HU keyword list (`classifyRoomZone`); PUBLIC sits on the +Y strip
+  (south/sunny facade preference), PRIVATE on -Y, SERVICE tucked interior. Per-floor envelope
+  aspect `TARGET_ENVELOPE_ASPECT = 1.4:1` (widely-cited residential proportion, not a normativ
+  figure — flagged as such in the module comment). Each floor solves its own envelope from its
+  own indoor room area, so an upper floor whose area ≤ the ground floor's produces a strictly
+  smaller envelope that sits inside the ground footprint at (0,0) — no cantilever/overhang,
+  which would need its own structural design. Slice-and-dice orders rooms area-descending and
+  splits along the longer axis each step (children stay close to square). An explicit
+  CORRIDOR room becomes a spine strip at least **MIN_CORRIDOR_WIDTH_M** (0.9 m, matching
+  `RulesService.minCorridorWidth`) wide. Deterministic — same input, byte-for-byte same output.
+  Solver does **not** create new Room DB rows (won't invent a corridor the AI didn't ask for);
+  it only positions rooms that already exist. **Citation-confidence note**: NP 057-2002's
+  specific per-room orientation table (which room faces which cardinal direction) could not be
+  extracted here — the official MDLPA PDF host systematically 403s in this environment, same
+  block that hit every prior law-module research pass. The zone grouping mirrors the widely-
+  cited RO architectural convention aligned with the normativ; the per-orientation table is a
+  follow-up citation gap, not a specification error.
+
+- **Openings-generation**: `packages/bim-engine/src/openings-generation.ts` (unit-tested).
+  Given the solved rooms + the walls `deriveWallsFromRooms` generates around them, emits three
+  kinds of openings:
+  - **Interior doors** — one per pair of rooms sharing an interior wall, centered on the
+    shared segment. Width per **RulesService.minDoorWidth** (matching C 253/8-1994 practice):
+    0.8 m internal, 0.7 m into a bathroom. Height 2.1 m, sillHeight 0. Both jambs sit
+    ≥`DOOR_JAMB_CLEAR_M` (0.25 m = `TIE_COLUMN_CROSS_SECTION_MM`) off the wall ends, so the
+    door doesn't collide with an S1 corner tie-column (CR6-2013 — see confined-masonry.ts).
+  - **Exterior windows** — sized to satisfy **Ordinul MS 119/2014** ("Norme de igienă
+    referitoare la zonele de locuit") natural-light requirement, using the commonly-cited 1/8
+    window-to-floor ratio (the 1/6…1/10 optimum range widely quoted for RO residential design).
+    Target area per room is split across whatever exterior wall segments that room borders,
+    ranked by facade preference (+Y "south" strongest). Widths snap to a common residential
+    module (0.6/0.9/1.2/1.5/1.8/2.4 m). Sill height 0.9 m default (residential parapet);
+    1.4 m in bathrooms/kitchens for privacy.
+  - **Entry door** — exactly one per house, on the ground-floor entry room (HALL/ENTRY if
+    present, else LIVING_ROOM, else the largest public-zone room), on its most-public exterior
+    facade. Width 0.9 m (`RulesService.minDoorWidth.entrance`).
+  Written only against **generated** walls (isGenerated=true); user-drawn walls and their
+  user-drawn openings are untouched. A wall shorter than the smallest door + 2 × jamb clear
+  (a legit tight corner) correctly receives no opening.
+
+- **Roof model + geometry**: `packages/bim-engine/src/roof.ts` (unit-tested) — pure spec calc
+  (pitch/overhang/ridge-height derivation). New Prisma `Roof` model + `RoofType` enum (GABLED
+  / HIPPED / FLAT / MONOSLOPE) via migration `add_roof`, plus a `ROOFING` value on
+  `MaterialCategory`. One `Roof` per house (unique on `houseId`), 1:1 with `House` via the new
+  `House.roof?` relation. `materialId` FK → a `MaterialCategory.ROOFING` seeded default:
+  `Țiglă ceramică Tondach standard` (Wienerberger RO / Tondach product line — SR EN 1304).
+  **Citations** (secondary-source corroborated, same confidence bar as the law-modules —
+  official STAS/normativ PDF hosts systematically 403 in this environment):
+  - **Default pitch 35°** — mid of the practical 30°–45° residential range, safely above every
+    Tondach standard-profile minimum (30° with continuous sheathing, cross-checked across two
+    manufacturer/technical-press sources). **NP 057-2002** explicitly names 30° as the snow-
+    retention threshold ("la acoperișurile cu pantă mai mare de 30° se vor prevedea opritoare
+    de zăpadă"), so anything above triggers snow-stop requirement — 35° is deliberately above
+    it so we don't hide the requirement in a marginal case. `pitchVerified: true`.
+  - **Default overhang 0.7 m** (streașină) — widely-cited RO residential convention (protects
+    facade from driving rain, plaster from snow melt). Not a normativ figure —
+    `overhangVerified: false`, surfaced the same way `specSheet.priceVerified: false` is.
+  - `deriveRidgeHeight`: symmetric roof over the footprint, ridge above center, height
+    `(shorter_span/2) · tan(pitch)`. Flat roof: 0 rise.
+
+- **`HousesService.solveAndRegenerate(houseId, userId)`** — the new orchestration entry
+  point. In one interactive transaction it (1) re-solves every room's position, (2) persists
+  posX/posY/width/area back to the Room rows, (3) deletes and recreates the generated walls,
+  (4) generates a fresh opening set on the new walls, then (5) auto-provisions / refreshes the
+  `Roof` row's ridge from the new topmost-floor footprint. Layer stacks / reinforcement /
+  lintels / tie-columns / centuri cascade with their parent walls and re-provision lazily on
+  next read — no extra wiring. This replaces every prior `regenerateGeneratedWalls` call from
+  the AI flow (`AiService.applyDesignUpdate`, `AiService.rebuildFromConversation`,
+  `HousesService.removeRoom`); the primitive is only kept for callers that specifically want
+  a wall-only pass. `nextRoomPosition` from `design-update-mapper.ts` is no longer used by
+  the AI flow — the export is left in place to avoid touching call-sites elsewhere.
+
+- **3D**: new `GET /houses/:id/roof` endpoint; new `apps/web/src/components/viewer3d/
+  RoofMesh.tsx` renders a symmetric gable (BufferGeometry with 6 vertices / 6 triangles —
+  2 slopes × 2 tris + 2 gable tris) plus 4 soffit strips under the overhang, wired in from
+  `HouseScene`. FLAT/MONOSLOPE fall back to a thin cap for now — a placeholder so the roof
+  doesn't disappear, real per-type geometry can ship later without touching the callsite.
+  Ridge runs along the footprint's longer side (RO residential convention). `WallMesh`'s
+  abstract-box mode now decomposes into patches with holes at every LOD tier (not just the
+  detail mortar-core mode), so doors and windows show up from first paint instead of reading
+  as a sealed brick block until the user zooms in.
+
+Still open: the manual "Adaugă perete" toolbar mode isn't wired to the API; the AI's
+`ADD_WALL` action remains unhandled (never observed to carry usable geometry); regenerating
+still drops openings that were manually added to a *generated* wall (they cascade with the
+wall row — put openings on manual walls, or re-add them once the room plan settles). No
+roof-panel UI or cost-engine BOQ line for roofing yet; a real hipped-roof topology (slopes
+falling to the ridge on all four sides) is not yet distinct from GABLED in geometry;
+FLAT/MONOSLOPE render as a thin-cap placeholder. NP 057-2002's per-room orientation table
+(which specific room prefers which cardinal direction) still uncited — the current zoning
+uses the widely-cited convention aligned with the normativ, not the extracted table.
 
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:

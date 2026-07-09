@@ -100,4 +100,9 @@ export class HousesController {
   getCenturi(@Param('id') houseId: string) {
     return this.housesService.getCenturi(houseId)
   }
+
+  @Get(':id/roof')
+  getRoof(@Param('id') houseId: string) {
+    return this.housesService.getRoof(houseId)
+  }
 }

@@ -10,7 +10,7 @@ import {
 import { prisma, Prisma } from '@ai-home-designer/database'
 import { getSystemPromptForLanguage } from './prompts/system.prompt'
 import { parseDesignResponse, type DesignResponse } from './schemas/design-response.schema'
-import { nextRoomPosition, roomFromDesignUpdateData } from './design-update-mapper'
+import { roomFromDesignUpdateData } from './design-update-mapper'
 import { SettingsService } from '../settings/settings.service'
 import { HousesService } from '../houses/houses.service'
 import { ProjectsService } from '../projects/projects.service'
@@ -196,7 +196,12 @@ export class AiService {
       select: { id: true, _count: { select: { rooms: true } } },
     })
     if (house && house._count.rooms > 0) {
-      await this.housesService.regenerateGeneratedWalls(house.id, userId)
+      // solveAndRegenerate: rebuilds every room's position via the floor-plan
+      // solver + walls + openings + roof from scratch. Idempotent — same rooms
+      // in the DB solve to the same layout every time. Repairs a house whose
+      // rooms were applied before the solver shipped without the user
+      // re-typing anything.
+      await this.housesService.solveAndRegenerate(house.id, userId)
     }
 
     return { appliedCount: applied.length, applied }
@@ -295,24 +300,22 @@ export class AiService {
           userId,
         )
         await this.housesService.recalculateTotalArea(house.id)
-        await this.housesService.regenerateGeneratedWalls(house.id, userId)
+        // solveAndRegenerate re-solves every room's position, regenerates
+        // walls, openings and the roof — the whole house follows any change.
+        await this.housesService.solveAndRegenerate(house.id, userId)
         return { action: 'updated', name: mapped.name, area: updated.area, floor: updated.floor }
       }
     }
 
-    const roomsOnFloor = await prisma.room.findMany({
-      where: { houseId: house.id, floor: mapped.floor },
-      select: { posX: true, width: true },
-    })
-    const { posX, posY } = nextRoomPosition(roomsOnFloor)
-
+    // posX/posY are placeholders; solveAndRegenerate overwrites them once the
+    // room is in the DB and the solver has the full room set to work from.
     const created = await this.housesService.addRoom(
       house.id,
-      { ...mapped, posX, posY },
+      { ...mapped, posX: 0, posY: 0 },
       userId,
     )
     await this.housesService.recalculateTotalArea(house.id)
-    await this.housesService.regenerateGeneratedWalls(house.id, userId)
+    await this.housesService.solveAndRegenerate(house.id, userId)
 
     return { action: 'created', name: mapped.name, area: created.area, floor: created.floor }
   }

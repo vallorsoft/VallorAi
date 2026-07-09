@@ -7,6 +7,8 @@ import type { House } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
 import { WallMesh } from './WallMesh'
 import { RoomFloor } from './RoomFloor'
+import { RoofMesh } from './RoofMesh'
+import { useRoof, useRoofFootprint } from './useRoof'
 import { BrickInstances } from './BrickInstances'
 import { useBrickInstances } from './useBrickInstances'
 import { RebarInstances } from './RebarInstances'
@@ -102,6 +104,8 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const showBricks = lodTier === 'detail' && !computing && pools.length > 0
   const rebar = useRebarInstances(house, lodTier === 'detail')
   const showRebar = lodTier === 'detail' && !rebar.computing && rebar.pools.length > 0
+  const { data: roof } = useRoof(house.id)
+  const roofFootprint = useRoofFootprint(house)
 
   return (
     <group position={[-centerX, 0, -centerZ]}>
@@ -137,6 +141,18 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <RebarInstances pool={pool} />
           </group>
         ))}
+      {roof && roofFootprint && (
+        <RoofMesh
+          roof={roof}
+          footprint={{
+            minX: roofFootprint.minX,
+            maxX: roofFootprint.maxX,
+            minZ: roofFootprint.minZ,
+            maxZ: roofFootprint.maxZ,
+          }}
+          baseY={floorElevation(roofFootprint.topFloor) + LEVEL_HEIGHT_M}
+        />
+      )}
       <Html fullscreen>
         <div className="absolute top-3 right-3 rounded-md bg-white/90 px-2.5 py-1 text-xs text-gray-500 shadow-sm pointer-events-none">
           {t.editor.viewer3d.lodLabel}: {lodTier}

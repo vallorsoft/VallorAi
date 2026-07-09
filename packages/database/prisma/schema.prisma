@@ -219,6 +219,7 @@ model House {
   foundations Foundation[]
   tieColumns  TieColumn[]
   centuri     Centura[]
+  roof        Roof?
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -260,6 +261,39 @@ model Room {
   house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
 
   @@index([houseId])
+}
+
+// The house's roof. Auto-provisioned on first HousesService.getRoof() call
+// from a footprint computed off the topmost floor's walls; parameters follow
+// packages/bim-engine roof.ts (deriveRoofSpec) — default 35° pitch, 0.7 m
+// overhang, ridge derived from footprint + pitch (see roof.ts's citation
+// comment for the standard references). `pitchVerified`/`overhangVerified`
+// mirror the same pattern as Foundation.depthVerified and Material.specSheet's
+// priceVerified: standards-cited defaults are marked true, convention-only
+// defaults false, and the UI is expected to surface the latter as unverified.
+//
+// `materialId` points to a `MaterialCategory.ROOFING` row (default:
+// `Țiglă ceramică Tondach standard` seeded in seed.ts) — same GENERIC_DEFAULT
+// vs. MANUFACTURER upgrade path the other AssemblyLayer materials follow
+// once the marketplace lands.
+model Roof {
+  id               String   @id @default(cuid())
+  houseId          String   @unique
+  type             RoofType
+  pitchDeg         Float
+  overhangM        Float
+  ridgeHeightM     Float
+  pitchVerified    Boolean  @default(true)
+  overhangVerified Boolean  @default(false)
+  materialId       String
+
+  house    House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([materialId])
 }
 
 model Wall {
@@ -329,6 +363,20 @@ enum MaterialCategory {
   PLASTER
   PAINT
   PRECAST
+  ROOFING
+}
+
+// The Roof geometry types the auto-provisioning solver knows about
+// (see packages/bim-engine roof.ts). MONOSLOPE / FLAT are placeholders —
+// only GABLED is rendered as a real ridge+two-slopes geometry in the 3D
+// viewer's first cut; the others are drawn as a flat cap until a specific
+// rendering ships. `House.roofType` (a legacy string field kept for UI
+// preference selection) is mirrored into `Roof.type` on auto-provision.
+enum RoofType {
+  GABLED
+  HIPPED
+  FLAT
+  MONOSLOPE
 }
 
 enum MaterialUnit {
@@ -384,6 +432,7 @@ model Material {
 
   assemblyLayers AssemblyLayer[]
   lintels        Lintel[]
+  roofs          Roof[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

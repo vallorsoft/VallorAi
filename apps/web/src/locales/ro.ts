@@ -124,6 +124,7 @@ export const ro = {
       masonryComputing: 'Se generează zidăria…',
       brickCountLabel: 'Cărămizi',
       rebarCountLabel: 'Bare de armătură',
+      stirrupCountLabel: 'Etrieri',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Accelerare hardware indisponibilă — detaliile de zidărie sunt dezactivate pentru fluiditate',
     },

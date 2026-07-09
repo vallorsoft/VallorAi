@@ -87,6 +87,49 @@ export async function fetchWallReinforcement(wallId: string): Promise<WallReinfo
   return res.data as WallReinforcementSpec[]
 }
 
+export interface ElementReinforcementSpec {
+  id: string
+  role: 'LONGITUDINAL' | 'STIRRUP' | 'TRANSVERSE'
+  barDiameterMm: number
+  spacingMm: number
+  barCount: number | null
+  coverMm: number
+  concreteClass: string
+}
+
+export interface TieColumnRow {
+  id: string
+  houseId: string
+  floor: number
+  posX: number
+  posY: number
+  category: 'S1' | 'S2' | 'S3'
+  crossSectionMm: number
+  concreteClass: string
+  reinforcementSpecs: ElementReinforcementSpec[]
+}
+
+export interface CenturaRow {
+  id: string
+  houseId: string
+  wallId: string
+  level: number
+  heightMm: number
+  widthMm: number
+  concreteClass: string
+  reinforcementSpecs: ElementReinforcementSpec[]
+}
+
+export async function fetchTieColumns(houseId: string): Promise<TieColumnRow[]> {
+  const res = await api.get(`/houses/${houseId}/tie-columns`)
+  return res.data as TieColumnRow[]
+}
+
+export async function fetchCenturi(houseId: string): Promise<CenturaRow[]> {
+  const res = await api.get(`/houses/${houseId}/centuri`)
+  return res.data as CenturaRow[]
+}
+
 export function useConversation(projectId: string) {
   return useQuery({
     queryKey: ['conversation', projectId],

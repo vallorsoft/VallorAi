@@ -42,8 +42,12 @@ vallorai/
    package's `main`/`types` pointing at raw `.ts` that Node couldn't execute.
 9. **No emoji anywhere in the UI, no copied visual design from other products, and nothing that
    suggests the site was AI-generated** (no generic "AI tool" clichés — gradient hero banners,
-   sparkle icons, boilerplate rounded cards). Audit is tracked but not yet done — see
-   "BIM-detail feature" status below.
+   sparkle icons, boilerplate rounded cards). **Audit done 2026-07-09**: every emoji glyph
+   replaced with lucide-react icons (sidebar, editor toolbar, AI chat greeting, project quick
+   actions/cards); the landing page's gradient hero + rounded shadow cards replaced with a flat
+   architectural layout (CSS-drawn floor-plan sketch — door swings, window marks, dimension
+   line — as the hero visual; top-ruled feature columns). An emoji scan of `apps/web/src`
+   reports zero hits — keep it that way for all new UI.
 
 ## Running locally
 ```bash
@@ -168,11 +172,15 @@ floors splayed side by side):
   pool to `floor * LEVEL_HEIGHT_M` (2.7m — a rendering constant matching `Wall.height`'s
   default, not a storey-height spec; there is still no slab/storey model).
 
-Still open: the manual "Adaugă perete" toolbar mode isn't wired to the API; the AI's `ADD_WALL`
-action remains unhandled (never observed to carry usable geometry); no doors/windows are
-generated (an AI-designed house's walls have no openings until added via the API), and
-regenerating drops openings that were manually added to a *generated* wall (they cascade with
-the wall row — put openings on manual walls, or re-add them once the room plan settles).
+Still open: the AI's `ADD_WALL` action remains unhandled (never observed to carry usable
+geometry); no doors/windows are AI-generated, and regenerating drops openings that were manually
+added to a *generated* wall (they cascade with the wall row — put openings on manual walls, or
+re-add them once the room plan settles). **Closed 2026-07-09**: the manual "Adaugă perete"
+toolbar mode is now wired (click-to-start, dashed preview, click-to-finish with 0.5m snap and
+segment chaining, Esc cancels; add-room places a default 4×3m room the same way), and openings
+are user-manageable — `OpeningsPanel` inside the wall inspector lists the selected wall's
+openings with their auto-provisioned lintel spec, adds doors/windows (fit-validated against the
+wall length) and deletes them via the new `DELETE /houses/openings/:id`.
 
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:
@@ -270,8 +278,10 @@ technical-press summaries of it), not from `docs/materials/`.
     rather than persisted at provision time, so filling in the site address later doesn't leave a
     stale "unverified" flag. Covered by `apps/api/test/foundation.e2e-spec.ts` (verified-locality
     depth, fallback-locality depth, idempotency).
-  - Not yet done: no UI panel (mirroring `WallLayerPanel`) surfaces this to the user yet; no cost
-    engine BOQ line for the foundation (still the flat `structure: 800 RON/m²` rate).
+  - UI + BOQ done 2026-07-09: `StructuralPanel.tsx` (editor right sidebar, shown when no wall is
+    selected) surfaces depth/width/concrete/rebar with the unverified-depth notice, and
+    `costs.service.ts` emits real foundation concrete + steel lines (see the structural-BOQ note
+    under "BIM-detail feature" Step 4's cost engine below/`calculateStructuralBoq`).
 
 - **Module 2 — Confined masonry: stâlpișori (tie-columns) + buiandrug (lintels), CR6-2013**.
   **Correction from the original module-2 plan above**: an earlier (unshipped) draft assumed a
@@ -329,9 +339,11 @@ technical-press summaries of it), not from `docs/materials/`.
     `apps/api/test/confined-masonry.e2e-spec.ts` (corner placement, mid-span spacing,
     **no column beside a plain below-threshold opening** — the corrected behavior — S3 jamb
     placement, lintel bearing/dimensions, idempotency of both).
-  - Not yet done: no UI panel; no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer
-    geometry (tie-columns would need their own instanced-box + bent-stirrup-loop rendering,
-    related to but not the same gap as the pre-existing Step 9 wall-stirrup gap).
+  - UI/BOQ/3D done 2026-07-09: `StructuralPanel.tsx` shows S1/S2/S3 counts + section/rebar;
+    `calculateStructuralBoq` emits tie-column concrete + cage steel and one prefab lintel line
+    per opening; BIM-detail Step 9 renders the instanced concrete shafts + full rebar cages
+    (bars + stirrup loops) at the detail LOD tier. Lintel specs surface per opening in
+    `OpeningsPanel`.
 
 - **Module 2b — S3 tie-columns (opening-triggered) + seismic ag lookup, CR6-2013 / P100-1/2013**.
   Fills the S3 gap the Module 2 entry documented. **Citation-confidence note**: the two opening-
@@ -361,8 +373,9 @@ technical-press summaries of it), not from `docs/materials/`.
     provisioning (per floor, openings matched to their host wall's floor). Covered by two new
     `confined-masonry.e2e-spec.ts` cases (large opening → 2 S3 jambs in the default high zone; a
     2.0m² opening → **no** S3 in Cluj/0.10g, exercising the ag lookup).
-  - Not yet done: the residual-pier-length S3 trigger (no confirmed threshold — still a gap); no
-    UI panel / cost BOQ line / 3D geometry for S3 (same as S1/S2).
+  - Not yet done: the residual-pier-length S3 trigger (no confirmed threshold — still a gap).
+    UI panel / cost BOQ / 3D geometry now exist for all categories incl. S3 (2026-07-09, same
+    machinery as S1/S2 — see Module 2's entry).
 
 - **Module 3 — Centuri (ring beams)**. **Citation-confidence note**: before starting this
   module, a dedicated research pass specifically tried OFFICIAL sources (ASRO, MDLPA,
@@ -408,9 +421,9 @@ technical-press summaries of it), not from `docs/materials/`.
     placements + reinforcement, idempotent like `getFoundation`/`getTieColumns`. Covered by
     `apps/api/test/centura.e2e-spec.ts` (own-level + above-top-floor placement, exterior-vs-
     interior height doubling, idempotency).
-  - Not yet done: no UI panel; no cost engine BOQ lines; no 3D-viewer geometry; the wall-set-back
-    width variant (250mm when set back for exterior insulation) isn't modeled, only the
-    wall-thickness-matching width.
+  - UI/BOQ/3D done 2026-07-09 (StructuralPanel section, `calculateStructuralBoq` concrete+steel
+    lines, Step 9 instanced prisms + cages). Still not modeled: the wall-set-back width variant
+    (250mm when set back for exterior insulation) — only the wall-thickness-matching width.
 
 ### Next (not started, planned in order)
 
@@ -634,11 +647,23 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
   Browser-verified on a seeded C25/30 wall (Ø12 @ 150mm, 25mm cover — SR 438-1-range values):
   overlay reports the 2 computed bars, wall translucency confirmed visually.
 
-### Next (Step 9, not started)
-
-9. **Stirrup/bent rebar** — needs both a new `bim-engine` calc function (stirrups are a bent
-   closed loop, not a straight bar — geometrically distinct from longitudinal rebar) and a
-   separate instance pool/geometry in the 3D viewer.
+- **Step 9 — stirrup/bent rebar + confining-element 3D geometry (done 2026-07-09)**:
+  `packages/bim-engine/src/structural-rebar.ts` (unit-tested): closed stirrup loops rendered as
+  4 centerline segments over the SAME unit-cylinder instancing convention as step 8 (no new
+  geometry type in the viewer) — `calculateStirrupQuantity`/`generateStirrupPositionsMm` (even
+  spacing so no gap exceeds the spec value, mirroring `detectMidSpanTieColumns`' conservative
+  stance; loop length is the centerline perimeter and explicitly EXCLUDES the end-hook/anchorage
+  allowance, which has no cited primary source — documented, not guessed), full tie-column cages
+  (`generateColumnRebarSegments`: 4 corner bars + horizontal loops), centură bars + vertical
+  loops (`generateRunLongitudinalSegments` — 2 bottom + 2 top rows, extras distributed evenly,
+  a rendering arrangement, not a cited bar schedule — and `generateRunStirrupSegments`), plus
+  world-space segment/box matrix composers (`composeSegmentInstanceMatrices`/
+  `composeWorldBoxMatrices`). In `apps/web`: `useStructuralInstances` fetches the
+  auto-provisioned tie-columns/centuri and pools translucent concrete boxes + steel cages per
+  floor at the `detail` LOD tier (`StructuralConcrete.tsx`); `useRebarInstances` now also renders
+  wall `STIRRUP` specs as loops; the overlay gained stirrup/tie-column/centură counts (i18n'd).
+  Browser-verified on the seeded 10×8 house: 5,088 bricks + 843 stirrups, 13 stâlpișori, 10
+  centuri rendering together at detail tier.
 
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable

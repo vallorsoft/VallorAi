@@ -1,6 +1,6 @@
 # AI Home Designer — Build Progress
 
-> Last updated: 2026-07-07 (BIM-detail feature, steps 0-4 done)
+> Last updated: 2026-07-09 (BIM-detail steps 0-9 done; law modules 1-3 UI/BOQ/3D done; editor drawing + openings UI; Key rule 9 design audit)
 
 ## Live status
 - **API**: https://vallorai-api.fly.dev/api/v1 — deployed, stable
@@ -215,10 +215,10 @@ repo and did not persist between sessions — `CLAUDE.md` is the durable referen
 | 3 | 2D wall layer-inspector panel (`WallLayerPanel.tsx`), click-to-select wall, i18n'd, browser-verified RO/HU/EN | ✅ |
 | 4 | Cost engine BOQ integration — real per-material lines replace flat masonry/plastering/painting/insulation rates once wall data exists | ✅ |
 | 5 | React Three Fiber viewer foundation (extruded-box walls, LOD scaffold, no brick detail yet) | ✅ |
-| 6 | Brick coursing + instancing for opening-free walls, perf-validated on one wall first | ⬜ |
-| 7 | Opening-aware cut-brick generation (centimeter-precise, anchored from openings) — biggest remaining engineering risk | ⬜ |
-| 8 | Longitudinal rebar instancing | ⬜ |
-| 9 | Stirrup/bent rebar geometry (distinct from longitudinal, separate calc + instance pool) | ⬜ |
+| 6 | Brick coursing + instancing for opening-free walls, perf-validated on one wall first | ✅ |
+| 7 | Opening-aware cut-brick generation (centimeter-precise, anchored from openings) | ✅ |
+| 8 | Longitudinal rebar instancing | ✅ |
+| 9 | Stirrup/bent rebar geometry + tie-column/centură 3D cages (structural-rebar.ts) | ✅ |
 
 Also still open: the new migration `20260707071500_add_material_assembly_reinforcement` has
 not yet been applied to production Neon (needs the same manual baseline/deploy treatment as
@@ -248,6 +248,23 @@ that route. Reproduces identically on unmodified `main`. Client-side `<Link>` na
 the editor (the only way the app's own UI reaches it) is unaffected. Worth a follow-up ticket
 (either add `canvas` as a dependency, or lazy-load `FloorPlanCanvas` with `next/dynamic` +
 `ssr: false`) but is separate from the BIM-detail viewer work.
+
+---
+
+## Session 2026-07-09 — remaining-work sweep (branch claude/pr33-completion-epiad4)
+
+All shipped with tests green (bim-engine 98 unit, API 28 e2e) and browser-verified against a
+local full stack (Postgres + API + web + Playwright):
+
+| Task | Status |
+|------|--------|
+| Editor SSR 500 fix (`FloorPlanCanvas` now client-only via `next/dynamic`; hard editor loads return 200) | ✅ |
+| BIM step 9 — stirrup loops + tie-column/centură 3D geometry (`packages/bim-engine/src/structural-rebar.ts`, `useStructuralInstances`, wall STIRRUP loops) | ✅ |
+| Cost engine structural BOQ — real foundation/tie-column/centură/lintel lines replace the flat `structure` rate (floor slabs stay unmodeled, documented) | ✅ |
+| `StructuralPanel.tsx` — foundation/stâlpișori/centuri inspector in the editor sidebar, standards-cited, i18n'd | ✅ |
+| Manual drawing wired: add-wall (snap, preview, chaining) + add-room click-to-place | ✅ |
+| `OpeningsPanel.tsx` — per-wall door/window list + add/delete, lintel spec shown per opening; new `DELETE /houses/openings/:id` | ✅ |
+| Key rule 9 audit — zero emoji (lucide icons everywhere), landing redesigned away from AI-tool clichés | ✅ |
 
 ---
 

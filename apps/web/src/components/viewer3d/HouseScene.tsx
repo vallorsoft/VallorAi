@@ -11,6 +11,8 @@ import { BrickInstances } from './BrickInstances'
 import { useBrickInstances } from './useBrickInstances'
 import { RebarInstances } from './RebarInstances'
 import { useRebarInstances } from './useRebarInstances'
+import { StructuralConcrete } from './StructuralConcrete'
+import { useStructuralInstances } from './useStructuralInstances'
 import { useLOD } from './useLOD'
 
 /**
@@ -102,6 +104,9 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const showBricks = lodTier === 'detail' && !computing && pools.length > 0
   const rebar = useRebarInstances(house, lodTier === 'detail')
   const showRebar = lodTier === 'detail' && !rebar.computing && rebar.pools.length > 0
+  const structural = useStructuralInstances(house, lodTier === 'detail')
+  const showStructural =
+    lodTier === 'detail' && !structural.computing && structural.concretePools.length > 0
 
   return (
     <group position={[-centerX, 0, -centerZ]}>
@@ -137,6 +142,20 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <RebarInstances pool={pool} />
           </group>
         ))}
+      {showStructural &&
+        structural.steelPools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.floor)}>
+            <RebarInstances pool={pool} />
+          </group>
+        ))}
+      {/* Translucent concrete renders after the steel so the cages inside
+          blend through it. */}
+      {showStructural &&
+        structural.concretePools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.floor)}>
+            <StructuralConcrete pool={pool} />
+          </group>
+        ))}
       <Html fullscreen>
         <div className="absolute top-3 right-3 rounded-md bg-white/90 px-2.5 py-1 text-xs text-gray-500 shadow-sm pointer-events-none">
           {t.editor.viewer3d.lodLabel}: {lodTier}
@@ -152,6 +171,26 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <>
               {' '}
               · {t.editor.viewer3d.rebarCountLabel}: {rebar.totalBars.toLocaleString()}
+            </>
+          )}
+          {(showRebar || showStructural) &&
+            rebar.totalStirrups + structural.stirrupCount > 0 && (
+              <>
+                {' '}
+                · {t.editor.viewer3d.stirrupCountLabel}:{' '}
+                {(rebar.totalStirrups + structural.stirrupCount).toLocaleString()}
+              </>
+            )}
+          {showStructural && structural.tieColumnCount > 0 && (
+            <>
+              {' '}
+              · {t.editor.viewer3d.tieColumnCountLabel}: {structural.tieColumnCount.toLocaleString()}
+            </>
+          )}
+          {showStructural && structural.centuraCount > 0 && (
+            <>
+              {' '}
+              · {t.editor.viewer3d.centuraCountLabel}: {structural.centuraCount.toLocaleString()}
             </>
           )}
           {lowPerfMode && (

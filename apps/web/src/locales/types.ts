@@ -121,6 +121,9 @@ export interface Dictionary {
       masonryComputing: string
       brickCountLabel: string
       rebarCountLabel: string
+      stirrupCountLabel: string
+      tieColumnCountLabel: string
+      centuraCountLabel: string
       fpsLabel: string
       lowPerfNotice: string
     }

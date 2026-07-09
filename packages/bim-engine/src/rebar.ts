@@ -1,11 +1,12 @@
 import type { RebarBarSpec, RebarQuantity, RebarInstanceTransform } from './types'
 
-// Longitudinal reinforcement only in this module — stirrups/étriers need a
-// distinct bent-loop geometry and are a separate, later step (see plan).
+// Longitudinal reinforcement in this module — stirrups/étriers have their
+// distinct bent-loop geometry in structural-rebar.ts (step 9).
 // Steel density per SR 438-1:2012-class reinforcing steel.
 const STEEL_DENSITY_KG_M3 = 7850
 
-function weightPerMeterKg(diameterMm: number): number {
+/** Unit weight of a round SR 438-1-class bar, kg per meter of bar length. */
+export function rebarWeightPerMeterKg(diameterMm: number): number {
   const areaM2 = Math.PI * (diameterMm / 2000) ** 2
   return areaM2 * STEEL_DENSITY_KG_M3
 }
@@ -25,7 +26,7 @@ export function calculateLongitudinalRebarQuantity(
   const barCount = Math.max(1, Math.floor(usableWidth / spec.spacingMm) + 1)
   const barLengthMm = element.lengthMm - 2 * spec.coverMm
   const totalLengthMm = barCount * barLengthMm
-  const totalWeightKg = (totalLengthMm / 1000) * weightPerMeterKg(spec.diameterMm)
+  const totalWeightKg = (totalLengthMm / 1000) * rebarWeightPerMeterKg(spec.diameterMm)
 
   return { barCount, totalLengthMm, totalWeightKg }
 }

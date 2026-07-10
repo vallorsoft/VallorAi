@@ -125,6 +125,8 @@ export const hu = {
       brickCountLabel: 'Téglák',
       rebarCountLabel: 'Betonacél rudak',
       stirrupCountLabel: 'Kengyerek',
+      tieColumnCountLabel: 'Merevítő oszlopok',
+      centuraCountLabel: 'Koszorúk',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Hardveres gyorsítás nem érhető el — a falazat-részletek a gördülékenység érdekében ki vannak kapcsolva',
     },

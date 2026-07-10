@@ -15,6 +15,10 @@ import { RebarInstances } from './RebarInstances'
 import { useRebarInstances } from './useRebarInstances'
 import { StirrupInstances } from './StirrupInstances'
 import { useStirrupInstances } from './useStirrupInstances'
+import { TieColumnInstances } from './TieColumnInstances'
+import { useTieColumnInstances } from './useTieColumnInstances'
+import { CenturaInstances } from './CenturaInstances'
+import { useCenturaInstances } from './useCenturaInstances'
 import { useLOD } from './useLOD'
 
 /**
@@ -108,6 +112,14 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const showRebar = lodTier === 'detail' && !rebar.computing && rebar.pools.length > 0
   const stirrup = useStirrupInstances(house, lodTier === 'detail')
   const showStirrup = lodTier === 'detail' && !stirrup.computing && stirrup.pools.length > 0
+  // Concrete bodies are cheap solid boxes — one instanced draw per floor per
+  // element type — so they render at every LOD tier (not gated on 'detail').
+  // The activation flag stays true once the scene has been shown once, so
+  // switching away and back doesn't refetch.
+  const tieColumn = useTieColumnInstances(house, true)
+  const showTieColumn = !tieColumn.computing && tieColumn.pools.length > 0
+  const centura = useCenturaInstances(house, true)
+  const showCentura = !centura.computing && centura.pools.length > 0
   const { data: roof } = useRoof(house.id)
   const roofFootprint = useRoofFootprint(house)
 
@@ -151,6 +163,18 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <StirrupInstances pool={pool} />
           </group>
         ))}
+      {showTieColumn &&
+        tieColumn.pools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.floor)}>
+            <TieColumnInstances pool={pool} />
+          </group>
+        ))}
+      {showCentura &&
+        centura.pools.map((pool) => (
+          <group key={pool.key} position-y={floorElevation(pool.level)}>
+            <CenturaInstances pool={pool} />
+          </group>
+        ))}
       {roof && roofFootprint && (
         <RoofMesh
           roof={roof}
@@ -184,6 +208,18 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
             <>
               {' '}
               · {t.editor.viewer3d.stirrupCountLabel}: {stirrup.totalLoops.toLocaleString()}
+            </>
+          )}
+          {showTieColumn && tieColumn.totalColumns > 0 && (
+            <>
+              {' '}
+              · {t.editor.viewer3d.tieColumnCountLabel}: {tieColumn.totalColumns.toLocaleString()}
+            </>
+          )}
+          {showCentura && centura.totalCenturi > 0 && (
+            <>
+              {' '}
+              · {t.editor.viewer3d.centuraCountLabel}: {centura.totalCenturi.toLocaleString()}
             </>
           )}
           {lowPerfMode && (

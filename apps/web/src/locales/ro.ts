@@ -125,6 +125,8 @@ export const ro = {
       brickCountLabel: 'Cărămizi',
       rebarCountLabel: 'Bare de armătură',
       stirrupCountLabel: 'Etrieri',
+      tieColumnCountLabel: 'Stâlpișori',
+      centuraCountLabel: 'Centuri',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Accelerare hardware indisponibilă — detaliile de zidărie sunt dezactivate pentru fluiditate',
     },

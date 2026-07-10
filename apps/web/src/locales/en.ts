@@ -125,6 +125,8 @@ export const en = {
       brickCountLabel: 'Bricks',
       rebarCountLabel: 'Rebar bars',
       stirrupCountLabel: 'Stirrups',
+      tieColumnCountLabel: 'Tie columns',
+      centuraCountLabel: 'Ring beams',
       fpsLabel: 'FPS',
       lowPerfNotice: 'Hardware acceleration unavailable — masonry detail is disabled to keep the view smooth',
     },

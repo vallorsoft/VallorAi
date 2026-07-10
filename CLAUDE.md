@@ -283,12 +283,19 @@ the current footprint on pitch change). Cost-engine BOQ now emits a `Țiglă cer
 standard` line from the topmost-floor exterior footprint + `overhangM` × `1/cos(pitch)` —
 `overhangVerified` / `pitchVerified` flow onto the `CostItem.verified` + `notes` fields so
 the UI can surface an "unverified overhang" the same way `Material.specSheet.priceVerified`
-is surfaced (`costs.service.ts`'s `calculateRoofBoq`). A real hipped-roof topology (slopes
-falling to the ridge on all four sides) is not yet distinct from GABLED in geometry;
-FLAT/MONOSLOPE render as a thin-cap placeholder. NP 057-2002's
-per-room orientation table (which specific room prefers which cardinal direction) still
-uncited — the current zoning uses the widely-cited convention aligned with the normativ,
-not the extracted table.
+is surfaced (`costs.service.ts`'s `calculateRoofBoq`). Every RoofType now has real
+per-type geometry in `RoofMesh.tsx`: HIPPED renders two trapezoidal main slopes + two
+triangular hip slopes converging on a shorter ridge (`long - short`, via the new
+`deriveHippedRidgeLength` in `packages/bim-engine/src/roof.ts`; a square footprint
+collapses smoothly to a 4-triangle pyramid); FLAT is an honest slab (`BoxGeometry` sitting
+on the walls with overhang extended, replacing the thin-cap placeholder); MONOSLOPE is a
+single sloped plane whose rise = `shortSide · tan(pitch)` (the full span, not half —
+matching the new `deriveMonoslopeRise` helper). GABLED is byte-identical to the prior
+6-vertex geometry. `deriveRidgeHeight` now routes MONOSLOPE through the full-span helper
+so the persisted `ridgeHeightM` reflects the real vertical extent of a monoslope roof.
+NP 057-2002's per-room orientation table (which specific room prefers which cardinal
+direction) still uncited — the current zoning uses the widely-cited convention aligned
+with the normativ, not the extracted table.
 
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:
@@ -465,9 +472,15 @@ technical-press summaries of it), not from `docs/materials/`.
     `Oțel beton B500C` kg lines for LONGITUDINAL (4-corner-bar count × storey height) and
     STIRRUP (via `calculateStirrupQuantity`). `calculateLintelBoq` emits one
     `Buiandrug prefabricat` BUC line per Opening on the house (does NOT create Lintel rows —
-    a read-only cost pass shouldn't mutate structural data). No 3D-viewer geometry for the
-    tie-column bodies themselves yet (BIM Step 9 shipped the stirrups' geometry inside them;
-    a solid concrete-column box + longitudinal-bar instancing is the remaining pass).
+    a read-only cost pass shouldn't mutate structural data). 3D-viewer geometry: the
+    concrete column body ships as `apps/web/src/components/viewer3d/TieColumnInstances.tsx`
+    (+ `useTieColumnInstances.ts`), one `InstancedMesh` per floor pool over a unit box
+    scaled to `crossSectionMm × storeyHeight × crossSectionMm` — a solid concrete-gray
+    column at (posX, floor·LEVEL_HEIGHT_M, posY), rendered at every LOD tier (cheap solid
+    box), so the S1/S2/S3 placements the API auto-provisions are now visually present in
+    the 3D view alongside the Step 9 stirrups inside them. LONGITUDINAL corner-bar
+    instancing for the tie-column's 4-fixed rebar (currently only wall LONGITUDINAL
+    instances ship) is still a follow-up.
 
 - **Module 2b — S3 tie-columns (opening-triggered) + seismic ag lookup, CR6-2013 / P100-1/2013**.
   Fills the S3 gap the Module 2 entry documented. **Citation-confidence note**: the two opening-
@@ -550,10 +563,18 @@ technical-press summaries of it), not from `docs/materials/`.
     (one per wall × its own floor + one at the above-top-floor level) into one `Beton C12/15`
     m³ line (widthMm × heightMm × wall length per row) plus per-diameter `Oțel beton B500C`
     kg lines for LONGITUDINAL (barCount × wall length) and STIRRUP (via
-    `calculateStirrupQuantity`). No 3D-viewer geometry for the ring-beam bodies themselves
-    yet (Step 9 stirrups are already drawn inside them); the wall-set-back width variant
-    (250mm when set back for exterior insulation) isn't modeled, only the wall-thickness-
-    matching width.
+    `calculateStirrupQuantity`). 3D-viewer geometry: the concrete beam body ships as
+    `apps/web/src/components/viewer3d/CenturaInstances.tsx` (+ `useCenturaInstances.ts`),
+    one `InstancedMesh` per centura level pool over a unit box scaled to
+    `wallLengthM × heightMm/1000 × widthMm/1000` and rotated to match its host wall's
+    axis (`WallMesh`'s `rotationY = -atan2(dz, dx)` convention). Each beam sits with its
+    top face at the top of its wall run (`wall.height - heightMm/1000` below the pool
+    baseline in the pool's local frame; the pool's level·LEVEL_HEIGHT_M lift puts the
+    beam top at (level+1)·LEVEL_HEIGHT_M in absolute coords). The extra above-top-floor
+    centura groups into its own pool by `level`, so it lifts one storey higher than its
+    host wall — matching how the API auto-provisions it. Same concrete-gray Lambert as
+    tie-columns. Still not modeled: the wall-set-back width variant (250mm when set back
+    for exterior insulation) — only the wall-thickness-matching width ships.
 
 ### Next (not started, planned in order)
 
@@ -836,10 +857,14 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
   shipped in `costs.service.ts` — see the per-module "Cost engine BOQ:" bullets on
   Foundation / Module 2 / Module 3 / roof + Step 9 above, and
   `apps/api/test/cost-boq.e2e-spec.ts` for coverage. Follow-ups still open: MEP / finishes /
-  interior doors / windows carpentry (still flat area-rates), a real hipped-roof geometry
-  distinct from GABLED (roof BOQ area is the same either way, but the 3D shape isn't yet),
-  and 3D-viewer geometry for the tie-column and centura bodies themselves (Step 9 stirrups
-  are drawn inside them, the concrete shells around them are not).
+  interior doors / windows carpentry (still flat area-rates). The other two follow-ups this
+  bullet used to document — a real hipped-roof geometry distinct from GABLED, and 3D-viewer
+  concrete-shell geometry for the tie-columns / centuri themselves — shipped: HIPPED / FLAT
+  / MONOSLOPE each have real per-type geometry in `RoofMesh.tsx` (see the Roof section
+  above), and `TieColumnInstances` / `CenturaInstances` render the concrete bodies at every
+  LOD tier alongside the Step 9 stirrups (see the confined-masonry / centura entries).
+  LONGITUDINAL corner-bar instancing for the tie-column's 4 fixed bars is still not modeled
+  — only wall LONGITUDINAL bars have viewer instances so far.
 
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable

@@ -273,10 +273,16 @@ gaps together — an AI-designed house now reads as an actual house in 2D and 3D
   detail mortar-core mode), so doors and windows show up from first paint instead of reading
   as a sealed brick block until the user zooms in.
 
-Still open: the manual "Adaugă perete" toolbar mode isn't wired to the API; the AI's
-`ADD_WALL` action remains unhandled (never observed to carry usable geometry); regenerating
-still drops openings that were manually added to a *generated* wall (they cascade with the
-wall row — put openings on manual walls, or re-add them once the room plan settles).
+Manual "Adaugă perete" is now wired: two clicks on `FloorPlanCanvas` in `editorMode ==
+'add-wall'` capture a world-space start + end and POST to `/houses/:id/walls` (interior default,
+`floor = activeFloor`); a dashed Konva preview line runs from the captured start to the current
+cursor, and a small i18n'd hint above the canvas tracks first-click vs second-click state
+(`editor.addWallHintFirstClick` / `editor.addWallHintSecondClick`, all 3 locales). On success
+the house + cost-estimate queries are invalidated and the editor drops back to `select` mode.
+Still open: the AI's `ADD_WALL` action remains unhandled (never observed to carry usable
+geometry); regenerating still drops openings that were manually added to a *generated* wall
+(they cascade with the wall row — put openings on manual walls, or re-add them once the room
+plan settles).
 Interactive `RoofPanel.tsx` (type dropdown + pitch/overhang inputs) is wired to the new
 `PATCH /houses/:id/roof` endpoint (`HousesService.updateRoof` recomputes ridgeHeightM off
 the current footprint on pitch change). Cost-engine BOQ now emits a `Țiglă ceramică Tondach
@@ -841,8 +847,14 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     and `GET /houses/:id/centuri` drives the horizontal 5m-centura layout to 34 loops × 4
     segments.
   - The STIRRUP row is now surfaced in the `TieColumnsPanel` and `CenturiPanel` alongside the
-    LONGITUDINAL row (see the confined-masonry / centura entries above); no dedicated
-    reinforcement panel exists yet. Cost engine BOQ: `costs.service.ts`'s
+    LONGITUDINAL row (see the confined-masonry / centura entries above); the `WallLayerPanel`
+    is now a two-tab inspector — the existing layer stack + a new "Vasalare" / "Vasalás" /
+    "Reinforcement" tab reading `GET /houses/walls/:id/reinforcement`, so any wall that carries
+    a reinforcement spec (LONGITUDINAL / STIRRUP / TRANSVERSE) has it visible in the editor.
+    Empty state (the norm for plain masonry) is the deliberate Key rule 7 outcome — no auto-
+    provisioned rebar. The `FoundationPanel` already surfaces the strip footing's TRANSVERSE +
+    LONGITUDINAL mats, so every element that carries reinforcement in the DB now has a UI view.
+    Cost engine BOQ: `costs.service.ts`'s
     `calculateStructuralBoq` now feeds each tie-column's and centura's STIRRUP spec into
     `calculateStirrupQuantity` alongside `calculateLongitudinalRebarQuantity` for the
     LONGITUDINAL bars, aggregated per-diameter into `Oțel beton B500C` kg lines. This closes
@@ -851,20 +863,33 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
 
 ### Next
 
-- Reinforcement panel UI (LONGITUDINAL + STIRRUP + TRANSVERSE) for foundations, tie-columns,
-  centuri, and any user-reinforced walls — the API already returns the data, no viewer yet.
+- Reinforcement panel UI for foundations, tie-columns, centuri and user-reinforced walls
+  shipped: `FoundationPanel` shows the strip footing's TRANSVERSE + LONGITUDINAL mats,
+  `TieColumnsPanel` and `CenturiPanel` show LONGITUDINAL + STIRRUP inline, and the two-tab
+  `WallLayerPanel` reads `GET /houses/walls/:id/reinforcement` for any user-reinforced wall
+  (empty state on plain masonry is the Key rule 7 outcome).
 - Cost-engine BOQ for structural rebar + foundation + tie-columns + centuri + lintels + roof
   shipped in `costs.service.ts` — see the per-module "Cost engine BOQ:" bullets on
   Foundation / Module 2 / Module 3 / roof + Step 9 above, and
-  `apps/api/test/cost-boq.e2e-spec.ts` for coverage. Follow-ups still open: MEP / finishes /
-  interior doors / windows carpentry (still flat area-rates). The other two follow-ups this
-  bullet used to document — a real hipped-roof geometry distinct from GABLED, and 3D-viewer
-  concrete-shell geometry for the tie-columns / centuri themselves — shipped: HIPPED / FLAT
-  / MONOSLOPE each have real per-type geometry in `RoofMesh.tsx` (see the Roof section
-  above), and `TieColumnInstances` / `CenturaInstances` render the concrete bodies at every
-  LOD tier alongside the Step 9 stirrups (see the confined-masonry / centura entries).
-  LONGITUDINAL corner-bar instancing for the tie-column's 4 fixed bars is still not modeled
-  — only wall LONGITUDINAL bars have viewer instances so far.
+  `apps/api/test/cost-boq.e2e-spec.ts` for coverage. The editor now surfaces those lines
+  via `apps/web/src/components/editor/CostBoqPanel.tsx` — a right-side inspector triggered
+  from the new "Deviz" / "Költségvetés" / "Cost BOQ" toolbar button (extending the
+  structural-panel union with `'cost-boq'`). It groups every real BOQ line by category
+  (foundation / walls / tie-columns / centuri / lintels / roof / other), shows material,
+  standard ref, quantity + unit, unit price and line total, sums a grand total in the
+  returned currency, and marks any `verified: false` / `priceVerified: false` line with an
+  amber "Neconfirmat" / "Nem ellenőrzött" / "Unverified" chip (mirroring `WallLayerPanel`'s
+  unverified-price disclosure). Data comes from `GET /costs/projects/:id/estimate` — the
+  new ownership-checked read (`ProjectsService.assertOwnership`, same pattern as the AI /
+  houses controllers), covered by an auth+ownership+happy-path e2e case in
+  `apps/api/test/cost-boq.e2e-spec.ts`. Follow-ups still open: MEP / finishes / interior
+  doors / windows carpentry (still flat area-rates); LONGITUDINAL corner-bar instancing for
+  the tie-column's 4 fixed bars is still not modeled — only wall LONGITUDINAL bars have
+  viewer instances so far. (The other two follow-ups this bullet used to document — a real
+  hipped-roof geometry distinct from GABLED, and 3D-viewer concrete-shell geometry for the
+  tie-columns / centuri themselves — shipped: HIPPED / FLAT / MONOSLOPE each have real
+  per-type geometry in `RoofMesh.tsx`, and `TieColumnInstances` / `CenturaInstances` render
+  the concrete bodies at every LOD tier alongside the Step 9 stirrups.)
 
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable

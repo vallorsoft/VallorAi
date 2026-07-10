@@ -279,9 +279,13 @@ still drops openings that were manually added to a *generated* wall (they cascad
 wall row — put openings on manual walls, or re-add them once the room plan settles).
 Interactive `RoofPanel.tsx` (type dropdown + pitch/overhang inputs) is wired to the new
 `PATCH /houses/:id/roof` endpoint (`HousesService.updateRoof` recomputes ridgeHeightM off
-the current footprint on pitch change). No cost-engine BOQ line for roofing yet; a real
-hipped-roof topology (slopes falling to the ridge on all four sides) is not yet distinct
-from GABLED in geometry; FLAT/MONOSLOPE render as a thin-cap placeholder. NP 057-2002's
+the current footprint on pitch change). Cost-engine BOQ now emits a `Țiglă ceramică Tondach
+standard` line from the topmost-floor exterior footprint + `overhangM` × `1/cos(pitch)` —
+`overhangVerified` / `pitchVerified` flow onto the `CostItem.verified` + `notes` fields so
+the UI can surface an "unverified overhang" the same way `Material.specSheet.priceVerified`
+is surfaced (`costs.service.ts`'s `calculateRoofBoq`). A real hipped-roof topology (slopes
+falling to the ridge on all four sides) is not yet distinct from GABLED in geometry;
+FLAT/MONOSLOPE render as a thin-cap placeholder. NP 057-2002's
 per-room orientation table (which specific room prefers which cardinal direction) still
 uncited — the current zoning uses the widely-cited convention aligned with the normativ,
 not the extracted table.
@@ -385,8 +389,14 @@ technical-press summaries of it), not from `docs/materials/`.
   - UI panel: `apps/web/src/components/editor/FoundationPanel.tsx` shows depth (+
     `depthVerified` badge), width, concrete class, the assembly layers, and the two
     reinforcement mats. Triggered from the `EditorToolbar` "Fundație" button; read-only for now.
-  - Not yet done: no cost engine BOQ line for the foundation (still the flat `structure: 800
-    RON/m²` rate).
+  - Cost engine BOQ: `costs.service.ts`'s `calculateFoundationBoq` now emits real per-material
+    lines from the auto-provisioned Foundation row and the ground-floor load-bearing wall
+    perimeter — `Beton de egalizare C8/10` m³ (lean layer), `Beton C16/20` m³ (structural
+    strip footing), and `Oțel beton B500C` kg for both the TRANSVERSE (resistance) and
+    LONGITUDINAL (distribution) mats via `calculateLongitudinalRebarQuantity` (transverse mat
+    computed with axes swapped so the composer's barCount becomes the number of transverse
+    bars along the perimeter). The flat `structure: 800 RON/m²` line is dropped once these
+    materialize; it falls back when the house has no ground-floor load-bearing walls yet.
 
 - **Module 2 — Confined masonry: stâlpișori (tie-columns) + buiandrug (lintels), CR6-2013**.
   **Correction from the original module-2 plan above**: an earlier (unshipped) draft assumed a
@@ -449,9 +459,15 @@ technical-press summaries of it), not from `docs/materials/`.
     (shown when an opening is selected — material, length, width, bearing length, prefabricated
     flag). Both read-only, triggered from the toolbar's "Stâlpișori" button and the opening
     selection respectively.
-  - Not yet done: no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer geometry for
-    the tie-column bodies themselves (BIM Step 9 shipped the stirrups' geometry inside them; a
-    solid concrete-column box + longitudinal-bar instancing is the remaining pass).
+  - Cost engine BOQ: `costs.service.ts`'s `calculateStructuralBoq` aggregates every S1/S2/S3
+    tie-column into one `Beton C12/15` m³ line (0.25 × 0.25 × storey height per column, storey
+    height read from the same-floor walls with a 2.7 m fallback) plus per-diameter
+    `Oțel beton B500C` kg lines for LONGITUDINAL (4-corner-bar count × storey height) and
+    STIRRUP (via `calculateStirrupQuantity`). `calculateLintelBoq` emits one
+    `Buiandrug prefabricat` BUC line per Opening on the house (does NOT create Lintel rows —
+    a read-only cost pass shouldn't mutate structural data). No 3D-viewer geometry for the
+    tie-column bodies themselves yet (BIM Step 9 shipped the stirrups' geometry inside them;
+    a solid concrete-column box + longitudinal-bar instancing is the remaining pass).
 
 - **Module 2b — S3 tie-columns (opening-triggered) + seismic ag lookup, CR6-2013 / P100-1/2013**.
   Fills the S3 gap the Module 2 entry documented. **Citation-confidence note**: the two opening-
@@ -530,8 +546,12 @@ technical-press summaries of it), not from `docs/materials/`.
     interior height doubling, idempotency).
   - UI panel: `CenturiPanel.tsx` (wallId, level, heightMm, widthMm, concrete class,
     LONGITUDINAL + STIRRUP specs) triggered from the toolbar's "Centuri" button. Read-only.
-  - Not yet done: no cost engine BOQ lines; no 3D-viewer geometry for the ring-beam bodies
-    themselves (Step 9 stirrups are already drawn inside them); the wall-set-back width variant
+  - Cost engine BOQ: `costs.service.ts`'s `calculateStructuralBoq` aggregates every centura
+    (one per wall × its own floor + one at the above-top-floor level) into one `Beton C12/15`
+    m³ line (widthMm × heightMm × wall length per row) plus per-diameter `Oțel beton B500C`
+    kg lines for LONGITUDINAL (barCount × wall length) and STIRRUP (via
+    `calculateStirrupQuantity`). No 3D-viewer geometry for the ring-beam bodies themselves
+    yet (Step 9 stirrups are already drawn inside them); the wall-set-back width variant
     (250mm when set back for exterior insulation) isn't modeled, only the wall-thickness-
     matching width.
 
@@ -801,16 +821,25 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     segments.
   - The STIRRUP row is now surfaced in the `TieColumnsPanel` and `CenturiPanel` alongside the
     LONGITUDINAL row (see the confined-masonry / centura entries above); no dedicated
-    reinforcement panel exists yet, and no cost-engine BOQ line for stirrups
-    (`calculateStirrupQuantity` is ready, the caller in `costs.service.ts` is not).
+    reinforcement panel exists yet. Cost engine BOQ: `costs.service.ts`'s
+    `calculateStructuralBoq` now feeds each tie-column's and centura's STIRRUP spec into
+    `calculateStirrupQuantity` alongside `calculateLongitudinalRebarQuantity` for the
+    LONGITUDINAL bars, aggregated per-diameter into `Oțel beton B500C` kg lines. This closes
+    the "the calc is ready, the caller in `costs.service.ts` is not" gap this note used to
+    document.
 
 ### Next
 
 - Reinforcement panel UI (LONGITUDINAL + STIRRUP + TRANSVERSE) for foundations, tie-columns,
   centuri, and any user-reinforced walls — the API already returns the data, no viewer yet.
-- Cost-engine BOQ for structural rebar (feed `calculateLongitudinalRebarQuantity` +
-  `calculateStirrupQuantity` into `costs.service.ts` alongside the existing wall-assembly
-  path) and for roofing (see the roof section above's "no BOQ line for roofing yet" note).
+- Cost-engine BOQ for structural rebar + foundation + tie-columns + centuri + lintels + roof
+  shipped in `costs.service.ts` — see the per-module "Cost engine BOQ:" bullets on
+  Foundation / Module 2 / Module 3 / roof + Step 9 above, and
+  `apps/api/test/cost-boq.e2e-spec.ts` for coverage. Follow-ups still open: MEP / finishes /
+  interior doors / windows carpentry (still flat area-rates), a real hipped-roof geometry
+  distinct from GABLED (roof BOQ area is the same either way, but the 3D shape isn't yet),
+  and 3D-viewer geometry for the tie-column and centura bodies themselves (Step 9 stirrups
+  are drawn inside them, the concrete shells around them are not).
 
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable

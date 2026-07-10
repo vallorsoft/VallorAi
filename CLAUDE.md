@@ -276,12 +276,15 @@ gaps together — an AI-designed house now reads as an actual house in 2D and 3D
 Still open: the manual "Adaugă perete" toolbar mode isn't wired to the API; the AI's
 `ADD_WALL` action remains unhandled (never observed to carry usable geometry); regenerating
 still drops openings that were manually added to a *generated* wall (they cascade with the
-wall row — put openings on manual walls, or re-add them once the room plan settles). No
-roof-panel UI or cost-engine BOQ line for roofing yet; a real hipped-roof topology (slopes
-falling to the ridge on all four sides) is not yet distinct from GABLED in geometry;
-FLAT/MONOSLOPE render as a thin-cap placeholder. NP 057-2002's per-room orientation table
-(which specific room prefers which cardinal direction) still uncited — the current zoning
-uses the widely-cited convention aligned with the normativ, not the extracted table.
+wall row — put openings on manual walls, or re-add them once the room plan settles).
+Interactive `RoofPanel.tsx` (type dropdown + pitch/overhang inputs) is wired to the new
+`PATCH /houses/:id/roof` endpoint (`HousesService.updateRoof` recomputes ridgeHeightM off
+the current footprint on pitch change). No cost-engine BOQ line for roofing yet; a real
+hipped-roof topology (slopes falling to the ridge on all four sides) is not yet distinct
+from GABLED in geometry; FLAT/MONOSLOPE render as a thin-cap placeholder. NP 057-2002's
+per-room orientation table (which specific room prefers which cardinal direction) still
+uncited — the current zoning uses the widely-cited convention aligned with the normativ,
+not the extracted table.
 
 ## Internationalization (i18n)
 Three supported locales: `ro` (default) · `hu` · `en`. Structure:
@@ -379,8 +382,11 @@ technical-press summaries of it), not from `docs/materials/`.
     rather than persisted at provision time, so filling in the site address later doesn't leave a
     stale "unverified" flag. Covered by `apps/api/test/foundation.e2e-spec.ts` (verified-locality
     depth, fallback-locality depth, idempotency).
-  - Not yet done: no UI panel (mirroring `WallLayerPanel`) surfaces this to the user yet; no cost
-    engine BOQ line for the foundation (still the flat `structure: 800 RON/m²` rate).
+  - UI panel: `apps/web/src/components/editor/FoundationPanel.tsx` shows depth (+
+    `depthVerified` badge), width, concrete class, the assembly layers, and the two
+    reinforcement mats. Triggered from the `EditorToolbar` "Fundație" button; read-only for now.
+  - Not yet done: no cost engine BOQ line for the foundation (still the flat `structure: 800
+    RON/m²` rate).
 
 - **Module 2 — Confined masonry: stâlpișori (tie-columns) + buiandrug (lintels), CR6-2013**.
   **Correction from the original module-2 plan above**: an earlier (unshipped) draft assumed a
@@ -438,9 +444,14 @@ technical-press summaries of it), not from `docs/materials/`.
     `apps/api/test/confined-masonry.e2e-spec.ts` (corner placement, mid-span spacing,
     **no column beside a plain below-threshold opening** — the corrected behavior — S3 jamb
     placement, lintel bearing/dimensions, idempotency of both).
-  - Not yet done: no UI panel; no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer
-    geometry (tie-columns would need their own instanced-box + bent-stirrup-loop rendering,
-    related to but not the same gap as the pre-existing Step 9 wall-stirrup gap).
+  - UI panels: `TieColumnsPanel.tsx` (S1/S2/S3 category badge, floor, cross-section, concrete
+    class, LONGITUDINAL barCount/diameter + STIRRUP diameter/spacing) and `LintelPanel.tsx`
+    (shown when an opening is selected — material, length, width, bearing length, prefabricated
+    flag). Both read-only, triggered from the toolbar's "Stâlpișori" button and the opening
+    selection respectively.
+  - Not yet done: no cost engine BOQ lines for tie-columns/lintels; no 3D-viewer geometry for
+    the tie-column bodies themselves (BIM Step 9 shipped the stirrups' geometry inside them; a
+    solid concrete-column box + longitudinal-bar instancing is the remaining pass).
 
 - **Module 2b — S3 tie-columns (opening-triggered) + seismic ag lookup, CR6-2013 / P100-1/2013**.
   Fills the S3 gap the Module 2 entry documented. **Citation-confidence note**: the two opening-
@@ -517,9 +528,12 @@ technical-press summaries of it), not from `docs/materials/`.
     placements + reinforcement, idempotent like `getFoundation`/`getTieColumns`. Covered by
     `apps/api/test/centura.e2e-spec.ts` (own-level + above-top-floor placement, exterior-vs-
     interior height doubling, idempotency).
-  - Not yet done: no UI panel; no cost engine BOQ lines; no 3D-viewer geometry; the wall-set-back
-    width variant (250mm when set back for exterior insulation) isn't modeled, only the
-    wall-thickness-matching width.
+  - UI panel: `CenturiPanel.tsx` (wallId, level, heightMm, widthMm, concrete class,
+    LONGITUDINAL + STIRRUP specs) triggered from the toolbar's "Centuri" button. Read-only.
+  - Not yet done: no cost engine BOQ lines; no 3D-viewer geometry for the ring-beam bodies
+    themselves (Step 9 stirrups are already drawn inside them); the wall-set-back width variant
+    (250mm when set back for exterior insulation) isn't modeled, only the wall-thickness-
+    matching width.
 
 ### Next (not started, planned in order)
 
@@ -785,10 +799,10 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     the STIRRUP spec → composer produces 4 segments × 18 loops (2.7m storey) per S1 column,
     and `GET /houses/:id/centuri` drives the horizontal 5m-centura layout to 34 loops × 4
     segments.
-  - Not yet done: no UI panel surfaces the STIRRUP spec next to the LONGITUDINAL one (same
-    "no reinforcement panel yet" gap the confined-masonry entry documents for S1/S2/S3); no
-    cost-engine BOQ line for stirrups (the calc `calculateStirrupQuantity` is ready, the
-    caller in `costs.service.ts` is not).
+  - The STIRRUP row is now surfaced in the `TieColumnsPanel` and `CenturiPanel` alongside the
+    LONGITUDINAL row (see the confined-masonry / centura entries above); no dedicated
+    reinforcement panel exists yet, and no cost-engine BOQ line for stirrups
+    (`calculateStirrupQuantity` is ready, the caller in `costs.service.ts` is not).
 
 ### Next
 

@@ -13,6 +13,9 @@ import {
   solveFloorPlan,
   generateOpenings,
   deriveRoofSpec,
+  deriveRidgeHeight,
+  DEFAULT_ROOF_PITCH_DEG,
+  DEFAULT_ROOF_OVERHANG_M,
   CENTURA_CONCRETE_CLASS,
   TIE_COLUMN_CROSS_SECTION_MM,
   TIE_COLUMN_CONCRETE_CLASS,
@@ -23,6 +26,7 @@ import {
   type RoofType,
   type SolvedRoomFootprint,
 } from '@ai-home-designer/bim-engine'
+import { BadRequestException } from '@nestjs/common'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
 @Injectable()
@@ -360,6 +364,108 @@ export class HousesService {
       where: { houseId },
       include: { material: true },
     })
+  }
+
+  /**
+   * User-driven roof edit. Validates `type` against the RoofType enum, coerces
+   * numeric fields, and when pitch changes (or the roof is being flipped
+   * to/from FLAT) recomputes `ridgeHeightM` off the current top-floor
+   * footprint via `deriveRidgeHeight` — same footprint the auto-provisioner
+   * uses. `pitchVerified` is set to whether the incoming value matches the
+   * standards-cited default (DEFAULT_ROOF_PITCH_DEG, mid of the NP 057-2002
+   * range) — a user drift off the default flips the badge to unverified,
+   * matching the `Material.specSheet.priceVerified` pattern.
+   * `overhangVerified` starts false (the default is convention only) and stays
+   * false once the user overrides it. Idempotent — the same body sent twice
+   * lands the same row.
+   */
+  async updateRoof(
+    houseId: string,
+    patch: { type?: string; pitchDeg?: number; overhangM?: number },
+    userId: string,
+  ) {
+    const existing = await this.getRoof(houseId)
+    if (!existing) throw new BadRequestException('Roof not available for this house')
+
+    const allowedTypes: RoofType[] = ['GABLED', 'HIPPED', 'FLAT', 'MONOSLOPE']
+    let nextType: RoofType = existing.type as RoofType
+    if (patch.type !== undefined) {
+      if (!allowedTypes.includes(patch.type as RoofType)) {
+        throw new BadRequestException(`Invalid roof type: ${patch.type}`)
+      }
+      nextType = patch.type as RoofType
+    }
+
+    let nextPitch = existing.pitchDeg
+    if (patch.pitchDeg !== undefined) {
+      const n = Number(patch.pitchDeg)
+      if (!Number.isFinite(n) || n < 0 || n > 89) {
+        throw new BadRequestException('pitchDeg must be a finite number between 0 and 89')
+      }
+      nextPitch = n
+    }
+    // FLAT always overrides pitch to 0 — the ridge math otherwise divides by
+    // tan(0) territory and the shape is by definition horizontal.
+    if (nextType === 'FLAT') nextPitch = 0
+
+    let nextOverhang = existing.overhangM
+    if (patch.overhangM !== undefined) {
+      const n = Number(patch.overhangM)
+      if (!Number.isFinite(n) || n < 0 || n > 3) {
+        throw new BadRequestException('overhangM must be a finite number between 0 and 3')
+      }
+      nextOverhang = n
+    }
+
+    // Recompute the ridge whenever the pitch or the type actually changes.
+    let nextRidge = existing.ridgeHeightM
+    if (nextPitch !== existing.pitchDeg || nextType !== existing.type) {
+      const walls = await prisma.wall.findMany({ where: { houseId } })
+      const topFloor = walls.reduce((max, w) => Math.max(max, w.floor), 0)
+      const topWalls = walls.filter((w) => w.floor === topFloor && w.isExterior)
+      const source = topWalls.length > 0 ? topWalls : walls
+      if (source.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const w of source) {
+          minX = Math.min(minX, w.startX, w.endX)
+          minY = Math.min(minY, w.startY, w.endY)
+          maxX = Math.max(maxX, w.startX, w.endX)
+          maxY = Math.max(maxY, w.startY, w.endY)
+        }
+        const lengthM = Math.max(maxX - minX, maxY - minY)
+        const widthM = Math.min(maxX - minX, maxY - minY)
+        if (lengthM > 0 && widthM > 0) {
+          nextRidge = deriveRidgeHeight(nextType, { lengthM, widthM }, nextPitch)
+        }
+      }
+    }
+
+    // Verified flags: mirror how Material.specSheet.priceVerified is treated
+    // (see WallLayerPanel) — cited-default → verified, user drift → unverified.
+    const pitchIsDefault =
+      (nextType === 'FLAT' && nextPitch === 0) ||
+      (nextType !== 'FLAT' && Math.abs(nextPitch - DEFAULT_ROOF_PITCH_DEG) < 0.01)
+    const overhangIsDefault = Math.abs(nextOverhang - DEFAULT_ROOF_OVERHANG_M) < 0.001
+    // `overhangVerified` is already `false` for the cited default (convention
+    // only). Any drift off the default keeps it false; a user landing exactly
+    // on the default does not flip an unverified value to verified.
+    const nextOverhangVerified = overhangIsDefault ? existing.overhangVerified : false
+
+    const updated = await prisma.roof.update({
+      where: { houseId },
+      data: {
+        type: nextType,
+        pitchDeg: nextPitch,
+        overhangM: nextOverhang,
+        ridgeHeightM: nextRidge,
+        pitchVerified: pitchIsDefault,
+        overhangVerified: nextOverhangVerified,
+      },
+      include: { material: true },
+    })
+
+    await this.projectVersions.snapshotHouse(houseId, userId)
+    return updated
   }
 
   async recalculateTotalArea(houseId: string) {

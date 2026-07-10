@@ -51,11 +51,24 @@ export interface House {
   openings?: Opening[]
 }
 
+/**
+ * House-scoped structural inspectors — Foundation / TieColumns / Centuri /
+ * Roof — are house-level (not tied to a Room or a specific Wall), so instead
+ * of overloading selectedRoomId/selectedWallId we track them as a sibling
+ * "structuralPanel" mode. When any structural panel is active, room/wall
+ * selection is cleared; conversely, selecting a Room or a Wall clears it,
+ * mirroring how selectRoom/selectWall already reset each other. Opening
+ * selection (for the lintel panel) has the same shape as room/wall — one id.
+ */
+export type StructuralPanel = 'foundation' | 'tie-columns' | 'centuri' | 'roof'
+
 interface ProjectStore {
   activeProjectId: string | null
   house: House | null
   selectedRoomId: string | null
   selectedWallId: string | null
+  selectedOpeningId: string | null
+  structuralPanel: StructuralPanel | null
   editorMode: 'select' | 'add-room' | 'add-wall'
   viewMode: '2d' | '3d'
   /** Floor level shown by the 2D canvas (the 3D view stacks all floors). */
@@ -64,6 +77,8 @@ interface ProjectStore {
   setHouse: (house: House) => void
   selectRoom: (id: string | null) => void
   selectWall: (id: string | null) => void
+  selectOpening: (id: string | null) => void
+  setStructuralPanel: (panel: StructuralPanel | null) => void
   setEditorMode: (mode: ProjectStore['editorMode']) => void
   setViewMode: (mode: ProjectStore['viewMode']) => void
   setActiveFloor: (floor: number) => void
@@ -74,14 +89,48 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   house: null,
   selectedRoomId: null,
   selectedWallId: null,
+  selectedOpeningId: null,
+  structuralPanel: null,
   editorMode: 'select',
   viewMode: '2d',
   activeFloor: 0,
   setActiveProject: (id) => set({ activeProjectId: id }),
   setHouse: (house) => set({ house }),
-  selectRoom: (id) => set({ selectedRoomId: id, selectedWallId: null }),
-  selectWall: (id) => set({ selectedWallId: id, selectedRoomId: null }),
+  selectRoom: (id) =>
+    set({
+      selectedRoomId: id,
+      selectedWallId: null,
+      selectedOpeningId: null,
+      structuralPanel: null,
+    }),
+  selectWall: (id) =>
+    set({
+      selectedWallId: id,
+      selectedRoomId: null,
+      selectedOpeningId: null,
+      structuralPanel: null,
+    }),
+  selectOpening: (id) =>
+    set({
+      selectedOpeningId: id,
+      selectedRoomId: null,
+      selectedWallId: null,
+      structuralPanel: null,
+    }),
+  setStructuralPanel: (panel) =>
+    set({
+      structuralPanel: panel,
+      selectedRoomId: null,
+      selectedWallId: null,
+      selectedOpeningId: null,
+    }),
   setEditorMode: (mode) => set({ editorMode: mode }),
   setViewMode: (mode) => set({ viewMode: mode }),
-  setActiveFloor: (floor) => set({ activeFloor: floor, selectedRoomId: null, selectedWallId: null }),
+  setActiveFloor: (floor) =>
+    set({
+      activeFloor: floor,
+      selectedRoomId: null,
+      selectedWallId: null,
+      selectedOpeningId: null,
+    }),
 }))

@@ -116,6 +116,77 @@ export interface Dictionary {
         PAINT: string
       }
     }
+    structuralInspector: {
+      toolFoundation: string
+      toolTieColumns: string
+      toolCenturi: string
+      toolRoof: string
+      toolLintel: string
+      loading: string
+      verified: string
+      unverified: string
+      unverifiedNotice: string
+      concreteClass: string
+      cover: string
+      barDiameter: string
+      barSpacing: string
+      barCount: string
+      role: {
+        LONGITUDINAL: string
+        STIRRUP: string
+        TRANSVERSE: string
+      }
+      foundation: {
+        title: string
+        depth: string
+        width: string
+        assemblyTitle: string
+        reinforcementTitle: string
+      }
+      tieColumns: {
+        title: string
+        empty: string
+        category: string
+        floor: string
+        crossSection: string
+      }
+      centuri: {
+        title: string
+        empty: string
+        wall: string
+        level: string
+        height: string
+        width: string
+      }
+      lintel: {
+        title: string
+        selectOpeningHint: string
+        material: string
+        length: string
+        width: string
+        bearingLength: string
+        prefabricated: string
+        yes: string
+        no: string
+      }
+      roof: {
+        title: string
+        typeLabel: string
+        pitch: string
+        overhang: string
+        ridgeHeight: string
+        material: string
+        pitchDefaultHint: string
+        overhangDefaultHint: string
+        saving: string
+        types: {
+          GABLED: string
+          HIPPED: string
+          FLAT: string
+          MONOSLOPE: string
+        }
+      }
+    }
     viewer3d: {
       lodLabel: string
       masonryComputing: string

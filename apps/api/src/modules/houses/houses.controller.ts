@@ -105,4 +105,13 @@ export class HousesController {
   getRoof(@Param('id') houseId: string) {
     return this.housesService.getRoof(houseId)
   }
+
+  @Patch(':id/roof')
+  updateRoof(
+    @Param('id') houseId: string,
+    @Body() body: { type?: string; pitchDeg?: number; overhangM?: number },
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.housesService.updateRoof(houseId, body, req.user.id)
+  }
 }

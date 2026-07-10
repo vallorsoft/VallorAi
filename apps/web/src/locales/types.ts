@@ -193,6 +193,8 @@ export interface Dictionary {
       brickCountLabel: string
       rebarCountLabel: string
       stirrupCountLabel: string
+      tieColumnCountLabel: string
+      centuraCountLabel: string
       fpsLabel: string
       lowPerfNotice: string
     }

@@ -61,9 +61,17 @@ export interface RoofFootprint {
 }
 
 /**
- * Derives the ridge rise for a symmetric roof over the given footprint. For a
- * gable/hipped roof, the ridge sits above the footprint's center at the height
- * `(shorter_span / 2) * tan(pitch)`. A flat roof has no rise (0).
+ * Derives the ridge rise for a symmetric roof over the given footprint.
+ *
+ * - GABLED / HIPPED: the ridge sits above the footprint's center at the height
+ *   `(shorter_span / 2) * tan(pitch)` — both slopes cover half the shorter
+ *   span. HIPPED's four-way topology raises the same ridge height, just with
+ *   two additional hip triangles at the ends (see deriveHippedRidgeLength).
+ * - MONOSLOPE: a single sloped plane. The high edge sits above one side and
+ *   the low edge above the opposite one, so the rise is the FULL shorter span
+ *   times tan(pitch), not half. Delegated to `deriveMonoslopeRise` so both
+ *   the geometry consumer and the ridge-height writer agree.
+ * - FLAT: no rise (0).
  */
 export function deriveRidgeHeight(
   type: RoofType,
@@ -72,8 +80,37 @@ export function deriveRidgeHeight(
 ): number {
   if (type === 'FLAT') return 0
   const span = Math.min(footprint.lengthM, footprint.widthM)
+  if (type === 'MONOSLOPE') {
+    return Math.round(deriveMonoslopeRise(span, pitchDeg) * 100) / 100
+  }
   const rise = (span / 2) * Math.tan((pitchDeg * Math.PI) / 180)
   return Math.round(rise * 100) / 100
+}
+
+/**
+ * Vertical rise over the full span for a single-slope (monoslope / mono-
+ * pitch / pupitru) roof — the high edge is over one facade, the low edge is
+ * over the opposite facade, so the roof plane covers the whole span at once
+ * (unlike a symmetric gable where each slope covers half). `span` is the
+ * horizontal distance between the two eaves.
+ */
+export function deriveMonoslopeRise(spanM: number, pitchDeg: number): number {
+  return spanM * Math.tan((pitchDeg * Math.PI) / 180)
+}
+
+/**
+ * Ridge length for a hipped roof over a rectangular footprint. Each end of
+ * the roof folds inward as a hip triangle whose apex sits over the ridge line
+ * at `shortSide/2` from the eave (same pitch as the main slopes → the hip's
+ * horizontal reach along the long axis is exactly half the short side). So
+ * the ridge — what remains between the two hip apexes — is
+ * `longSide - shortSide`, clamped to 0 (a square footprint collapses to a
+ * pyramid with a single apex, no ridge).
+ */
+export function deriveHippedRidgeLength(footprint: RoofFootprint): number {
+  const long = Math.max(footprint.lengthM, footprint.widthM)
+  const short = Math.min(footprint.lengthM, footprint.widthM)
+  return Math.max(0, long - short)
 }
 
 /**

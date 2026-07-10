@@ -112,6 +112,46 @@ describe('Cost engine BOQ integration (e2e)', () => {
     expect(res.body.data.total).toBeGreaterThan(0)
   })
 
+  it('exposes the same BOQ via GET /costs/projects/:id/estimate (auth + ownership)', async () => {
+    // The editor's CostBoqPanel reads via this GET endpoint — it must return
+    // the same { breakdown, total, currency } shape as the POST /estimate
+    // used above. Ownership guard is checked separately (a stranger's token
+    // gets a 403).
+    // First fetch the project id off the house we already set up in beforeAll.
+    const house = await prisma.house.findUnique({ where: { id: houseId } })
+    expect(house).toBeTruthy()
+    const projectId = house!.projectId
+
+    // Auth guard: an unauthenticated call must 401.
+    await request(server).get(`/api/v1/costs/projects/${projectId}/estimate`).expect(401)
+
+    // Ownership guard: a different user's token must 403.
+    const otherToken = await registerAndVerify(
+      server,
+      `cost-boq-stranger-${Date.now()}@example.com`,
+      'Cost BOQ Stranger',
+    )
+    await request(server)
+      .get(`/api/v1/costs/projects/${projectId}/estimate`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(403)
+
+    // Happy path: the project owner sees real BOQ lines.
+    const res = await request(server)
+      .get(`/api/v1/costs/projects/${projectId}/estimate`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+
+    expect(res.body.data.currency).toBe('RON')
+    expect(Array.isArray(res.body.data.breakdown)).toBe(true)
+    const structuralLine = res.body.data.breakdown.find(
+      (l: { category: string }) => l.category === 'wall-structural',
+    )
+    expect(structuralLine).toBeDefined()
+    expect(structuralLine.name).toBe('Leiertherm 38 N+F')
+    expect(res.body.data.total).toBeGreaterThan(0)
+  })
+
   it('subtracts door/window openings from the wall BOQ (net area)', async () => {
     // A 1.5m × 1.2m window -> 1.8 m² subtracted from the 25 m² wall.
     await request(server)

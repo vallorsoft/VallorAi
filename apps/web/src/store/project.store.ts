@@ -60,7 +60,19 @@ export interface House {
  * mirroring how selectRoom/selectWall already reset each other. Opening
  * selection (for the lintel panel) has the same shape as room/wall — one id.
  */
-export type StructuralPanel = 'foundation' | 'tie-columns' | 'centuri' | 'roof'
+export type StructuralPanel = 'foundation' | 'tie-columns' | 'centuri' | 'roof' | 'cost-boq'
+
+/**
+ * In-progress state for the manual "Adaugă perete" toolbar mode. When the
+ * user clicks the canvas once in add-wall mode, we capture the start point
+ * here; the next click reads it, calls POST /houses/:id/walls, and resets
+ * this to null. Kept on the store so FloorPlanCanvas can render a dashed
+ * preview line without lifting the state into a parent.
+ */
+export interface WallPlacementStart {
+  x: number
+  y: number
+}
 
 interface ProjectStore {
   activeProjectId: string | null
@@ -73,6 +85,8 @@ interface ProjectStore {
   viewMode: '2d' | '3d'
   /** Floor level shown by the 2D canvas (the 3D view stacks all floors). */
   activeFloor: number
+  /** First-click state for the manual add-wall placement — see WallPlacementStart. */
+  wallPlacementStart: WallPlacementStart | null
   setActiveProject: (id: string) => void
   setHouse: (house: House) => void
   selectRoom: (id: string | null) => void
@@ -82,6 +96,7 @@ interface ProjectStore {
   setEditorMode: (mode: ProjectStore['editorMode']) => void
   setViewMode: (mode: ProjectStore['viewMode']) => void
   setActiveFloor: (floor: number) => void
+  setWallPlacementStart: (start: WallPlacementStart | null) => void
 }
 
 export const useProjectStore = create<ProjectStore>((set) => ({
@@ -94,6 +109,7 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   editorMode: 'select',
   viewMode: '2d',
   activeFloor: 0,
+  wallPlacementStart: null,
   setActiveProject: (id) => set({ activeProjectId: id }),
   setHouse: (house) => set({ house }),
   selectRoom: (id) =>
@@ -124,7 +140,14 @@ export const useProjectStore = create<ProjectStore>((set) => ({
       selectedWallId: null,
       selectedOpeningId: null,
     }),
-  setEditorMode: (mode) => set({ editorMode: mode }),
+  setEditorMode: (mode) =>
+    set({
+      editorMode: mode,
+      // Any editor-mode switch clears the in-flight add-wall start point so
+      // the next entry into add-wall mode begins fresh.
+      wallPlacementStart: null,
+    }),
+  setWallPlacementStart: (start) => set({ wallPlacementStart: start }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setActiveFloor: (floor) =>
     set({

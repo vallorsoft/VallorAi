@@ -35,6 +35,7 @@ export function EditorToolbar() {
     { panel: 'tie-columns' as const, label: t.editor.structuralInspector.toolTieColumns },
     { panel: 'centuri' as const, label: t.editor.structuralInspector.toolCenturi },
     { panel: 'roof' as const, label: t.editor.structuralInspector.toolRoof },
+    { panel: 'cost-boq' as const, label: t.editor.toolCostBoq },
   ]
 
   const views = [

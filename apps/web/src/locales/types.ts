@@ -88,8 +88,11 @@ export interface Dictionary {
     toolSelect: string
     toolAddRoom: string
     toolAddWall: string
+    toolCostBoq: string
     toolView2d: string
     toolView3d: string
+    addWallHintFirstClick: string
+    addWallHintSecondClick: string
     selectRoomHint: string
     selectedRoomLabel: string
     area: string
@@ -108,12 +111,38 @@ export interface Dictionary {
       standardColumn: string
       priceColumn: string
       priceUnverifiedNotice: string
+      tabLayers: string
+      tabReinforcement: string
       functionLabels: {
         STRUCTURAL: string
         INSULATION: string
         RENDER: string
         FINISH: string
         PAINT: string
+      }
+    }
+    wallReinforcement: {
+      title: string
+      empty: string
+    }
+    costBoqPanel: {
+      title: string
+      grandTotal: string
+      loading: string
+      empty: string
+      unverifiedChip: string
+      quantityColumn: string
+      unitPriceColumn: string
+      lineTotalColumn: string
+      standardColumn: string
+      categories: {
+        wall: string
+        foundation: string
+        tieColumn: string
+        centura: string
+        lintel: string
+        roof: string
+        other: string
       }
     }
     structuralInspector: {

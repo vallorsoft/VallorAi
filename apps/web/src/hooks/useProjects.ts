@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 
+/**
+ * Structural + roof spec panels — hooks. These mirror useWallLayers's shape:
+ * one useQuery per element, keyed by the id the API takes. Everything is
+ * read-only except the roof, which has an interactive PATCH via useUpdateRoof
+ * (backed by HousesService.updateRoof).
+ */
+
 export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
@@ -128,6 +135,143 @@ export async function fetchTieColumns(houseId: string): Promise<TieColumnRow[]> 
 export async function fetchCenturi(houseId: string): Promise<CenturaRow[]> {
   const res = await api.get(`/houses/${houseId}/centuri`)
   return res.data as CenturaRow[]
+}
+
+export function useTieColumns(houseId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['tie-columns', houseId],
+    queryFn: () => fetchTieColumns(houseId as string),
+    enabled: !!houseId,
+  })
+}
+
+export function useCenturi(houseId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['centuri', houseId],
+    queryFn: () => fetchCenturi(houseId as string),
+    enabled: !!houseId,
+  })
+}
+
+export interface FoundationAssemblyLayer {
+  id: string
+  order: number
+  thicknessMm: number
+  function: 'STRUCTURAL' | 'INSULATION' | 'RENDER' | 'FINISH' | 'PAINT'
+  material: {
+    id: string
+    category: string
+    name: string
+    standardRef: string | null
+    unit: string
+    unitCostRON: number
+    specSheet: { priceVerified?: boolean } & Record<string, unknown>
+  }
+}
+
+export interface FoundationRow {
+  id: string
+  houseId: string
+  depthMm: number
+  widthMm: number
+  concreteClass: string
+  /** Recomputed on every read from the current Plot locality — see HousesService.getFoundation. */
+  depthVerified: boolean
+  assemblyLayers: FoundationAssemblyLayer[]
+  reinforcementSpecs: ElementReinforcementSpec[]
+}
+
+export function useFoundation(houseId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['foundation', houseId],
+    queryFn: async () => {
+      const res = await api.get(`/houses/${houseId}/foundation`)
+      return res.data as FoundationRow
+    },
+    enabled: !!houseId,
+  })
+}
+
+export interface LintelRow {
+  id: string
+  openingId: string
+  lengthMm: number
+  widthMm: number
+  bearingLengthMm: number
+  prefabricated: boolean
+  material: {
+    id: string
+    name: string
+    standardRef: string | null
+    unit: string
+    unitCostRON: number
+    specSheet: { priceVerified?: boolean } & Record<string, unknown>
+  }
+}
+
+export function useLintel(openingId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['lintel', openingId],
+    queryFn: async () => {
+      const res = await api.get(`/houses/openings/${openingId}/lintel`)
+      return res.data as LintelRow
+    },
+    enabled: !!openingId,
+  })
+}
+
+/**
+ * Editor-side roof data (with the material + verified flags). The 3D viewer
+ * has its own useRoof in components/viewer3d/useRoof.ts that returns a leaner
+ * shape (no material); the two hooks intentionally coexist rather than force
+ * every 3D consumer to depend on the material lookup they don't need.
+ */
+export type EditorRoofType = 'GABLED' | 'HIPPED' | 'FLAT' | 'MONOSLOPE'
+
+export interface EditorRoof {
+  id: string
+  houseId: string
+  type: EditorRoofType
+  pitchDeg: number
+  overhangM: number
+  ridgeHeightM: number
+  pitchVerified: boolean
+  overhangVerified: boolean
+  material: {
+    id: string
+    name: string
+    standardRef: string | null
+    unit: string
+    unitCostRON: number
+    specSheet: { priceVerified?: boolean } & Record<string, unknown>
+  } | null
+}
+
+export function useEditorRoof(houseId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['editor-roof', houseId],
+    queryFn: async () => {
+      const res = await api.get(`/houses/${houseId}/roof`)
+      return res.data as EditorRoof
+    },
+    enabled: !!houseId,
+  })
+}
+
+export function useUpdateRoof(houseId: string | null | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (patch: { type?: EditorRoofType; pitchDeg?: number; overhangM?: number }) => {
+      const res = await api.patch(`/houses/${houseId}/roof`, patch)
+      return res.data as EditorRoof
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['editor-roof', houseId], data)
+      // The 3D viewer reads via its own useRoof hook — invalidate so it
+      // re-fetches the new pitch/type.
+      qc.invalidateQueries({ queryKey: ['roof', houseId] })
+    },
+  })
 }
 
 export function useConversation(projectId: string) {

@@ -5,6 +5,11 @@ import { FloorPlanCanvas } from './FloorPlanCanvas'
 import { EditorToolbar } from './EditorToolbar'
 import { RoomPanel } from './RoomPanel'
 import { WallLayerPanel } from './WallLayerPanel'
+import { FoundationPanel } from './FoundationPanel'
+import { TieColumnsPanel } from './TieColumnsPanel'
+import { CenturiPanel } from './CenturiPanel'
+import { RoofPanel } from './RoofPanel'
+import { LintelPanel } from './LintelPanel'
 import { Viewer3D } from '@/components/viewer3d/Viewer3D'
 import { AiChat } from '@/components/ai/AiChat'
 import { useHouse } from '@/hooks/useProjects'
@@ -16,7 +21,14 @@ type MobilePanel = 'chat' | 'plan' | 'properties'
 export function EditorLayout({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
   const { data: house } = useHouse(projectId)
-  const { setHouse, setActiveProject, selectedWallId, viewMode } = useProjectStore()
+  const {
+    setHouse,
+    setActiveProject,
+    selectedWallId,
+    selectedOpeningId,
+    structuralPanel,
+    viewMode,
+  } = useProjectStore()
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('plan')
 
   useEffect(() => {
@@ -81,13 +93,56 @@ export function EditorLayout({ projectId }: { projectId: string }) {
           } lg:block w-full lg:w-64 bg-white lg:border-l border-gray-200 overflow-y-auto`}
         >
           <div className="border-b border-gray-100 px-4 py-3">
-            <h3 className="font-medium text-sm text-gray-700">
-              {selectedWallId ? t.editor.layerPanel.title : t.editor.propertiesTitle}
-            </h3>
+            <h3 className="font-medium text-sm text-gray-700">{panelTitle(t, {
+              selectedWallId,
+              selectedOpeningId,
+              structuralPanel,
+            })}</h3>
           </div>
-          {selectedWallId ? <WallLayerPanel /> : <RoomPanel projectId={projectId} />}
+          {renderRightPanel({
+            selectedWallId,
+            selectedOpeningId,
+            structuralPanel,
+            projectId,
+          })}
         </div>
       </div>
     </div>
   )
+}
+
+interface PanelSelectionState {
+  selectedWallId: string | null
+  selectedOpeningId: string | null
+  structuralPanel: ReturnType<typeof useProjectStore.getState>['structuralPanel']
+}
+
+/** Right-side panel header title. Precedence: structural inspector > opening > wall > default properties. */
+function panelTitle(
+  t: ReturnType<typeof useTranslation>['t'],
+  { selectedWallId, selectedOpeningId, structuralPanel }: PanelSelectionState,
+): string {
+  if (structuralPanel === 'foundation') return t.editor.structuralInspector.foundation.title
+  if (structuralPanel === 'tie-columns') return t.editor.structuralInspector.tieColumns.title
+  if (structuralPanel === 'centuri') return t.editor.structuralInspector.centuri.title
+  if (structuralPanel === 'roof') return t.editor.structuralInspector.roof.title
+  if (selectedOpeningId) return t.editor.structuralInspector.lintel.title
+  if (selectedWallId) return t.editor.layerPanel.title
+  return t.editor.propertiesTitle
+}
+
+/** Which right-side panel to render. Same precedence as panelTitle. */
+function renderRightPanel({
+  selectedWallId,
+  selectedOpeningId,
+  structuralPanel,
+  projectId,
+}: PanelSelectionState & { projectId: string }) {
+  if (structuralPanel === 'foundation') return <FoundationPanel />
+  if (structuralPanel === 'tie-columns') return <TieColumnsPanel />
+  if (structuralPanel === 'centuri') return <CenturiPanel />
+  if (structuralPanel === 'roof') return <RoofPanel />
+  if (selectedOpeningId) return <LintelPanel />
+  if (selectedWallId) return <WallLayerPanel />
+  return <RoomPanel projectId={projectId} />
 }

@@ -12,13 +12,29 @@ function floorLabel(floor: number, t: Dictionary) {
 
 export function EditorToolbar() {
   const { t } = useTranslation()
-  const { editorMode, setEditorMode, viewMode, setViewMode, house, activeFloor, setActiveFloor } =
-    useProjectStore()
+  const {
+    editorMode,
+    setEditorMode,
+    viewMode,
+    setViewMode,
+    house,
+    activeFloor,
+    setActiveFloor,
+    structuralPanel,
+    setStructuralPanel,
+  } = useProjectStore()
 
   const tools = [
     { mode: 'select' as const, label: t.editor.toolSelect, icon: '↖' },
     { mode: 'add-room' as const, label: t.editor.toolAddRoom, icon: '⬜' },
     { mode: 'add-wall' as const, label: t.editor.toolAddWall, icon: '—' },
+  ]
+
+  const structuralTools = [
+    { panel: 'foundation' as const, label: t.editor.structuralInspector.toolFoundation },
+    { panel: 'tie-columns' as const, label: t.editor.structuralInspector.toolTieColumns },
+    { panel: 'centuri' as const, label: t.editor.structuralInspector.toolCenturi },
+    { panel: 'roof' as const, label: t.editor.structuralInspector.toolRoof },
   ]
 
   const views = [
@@ -35,7 +51,7 @@ export function EditorToolbar() {
 
   return (
     <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between gap-2 px-2 sm:px-4 overflow-x-auto">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap">
         {tools.map((tool) => (
           <button
             key={tool.mode}
@@ -48,6 +64,25 @@ export function EditorToolbar() {
             }`}
           >
             <span className="mr-1.5">{tool.icon}</span>
+            {tool.label}
+          </button>
+        ))}
+        {/* Structural-inspector triggers — toggle any of these to swap the
+            right-side panel to the matching house-level spec (Foundation /
+            TieColumns / Centuri / Roof). Click the active one again to
+            clear back to the Room panel. */}
+        <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden />
+        {structuralTools.map((tool) => (
+          <button
+            key={tool.panel}
+            onClick={() => setStructuralPanel(structuralPanel === tool.panel ? null : tool.panel)}
+            title={tool.label}
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              structuralPanel === tool.panel
+                ? 'bg-brand-500 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
             {tool.label}
           </button>
         ))}

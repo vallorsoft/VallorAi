@@ -584,20 +584,74 @@ technical-press summaries of it), not from `docs/materials/`.
 
 ### Next (not started, planned in order)
 
-- **S3 tie-columns — area+ag branch DONE (Module 2b above)**. Remaining open: (a) a fuller
-  cited peak-ground-acceleration-by-locality (ag) table — Module 2b seeds only 4 cross-checked
-  cities (`AG_BY_LOCALITY`) and falls back conservatively for the rest, so more cited localities
-  would sharpen it without changing behavior; (b) the residual minimum-pier-length trigger (the
-  second S3 condition), still with no confirmed primary-source threshold.
+- **S3 tie-columns — area+ag branch DONE (Module 2b above)**. `AG_BY_LOCALITY` expansion pass
+  (2026-07-10, PR #47) grew the cited coverage from 4 to **7 cross-checked cities** — Timișoara
+  0.20g (two academic Timișoara-vulnerability case studies), Constanța 0.20g (OAR 2022 park-
+  concurs doc + Dlubal reference), Ploiești 0.35g (Observatorul Prahovean's stated 0.35
+  seismic-indicator + Fanatik risk summary + Encipedia PGA range) joined the original
+  București / Iași / Focșani-Vrancea / Cluj-Napoca set. Every added entry carries an inline
+  citation to its two independently-phrased secondary sources. Remaining ungathered under this
+  pass (documented in the seismic.ts module doc comment): Brașov, Craiova, Bacău, Buzău,
+  Galați, Brăila, Sibiu, Sfântu Gheorghe, Suceava, Târgu Mureș, Oradea, Arad, Baia Mare,
+  Botoșani — all described in prose as "middle range" / "high hazard" without converging on a
+  specific 0.05g P100-1/2013 bucket in any two sources tried (Dlubal, Encipedia, Fanatik,
+  MDPI, arXiv, ResearchGate); the official MDLPA interactive map + Encipedia's PDF host
+  systematically 403 in this environment. The conservative fallback (`FALLBACK_AG_G` =
+  0.25g, `verified: false`) still applies for every unlisted locality, so behavior for those
+  is unchanged. Still open: (b) the residual minimum-pier-length S3 trigger — still with no
+  confirmed primary-source threshold.
 - **Module 4 — Frame-column reinforcement (P100-1/2013)** — only relevant once/if a
   non-confined-masonry (frame) house type exists; the project is masonry-only today.
-- Concrete cover table completion (NE 012/1-2022 Annex J) for elements beyond the footing/
-  tie-column/centură cases above (walls, slabs) — deliberately left open, not guessed. The
-  Module 3 research pass confirmed the table lives in NE 012/1-2022 Annex J but could not
-  retrieve the actual mm values (official PDF hosts systematically 403 in this environment).
-- Monolithic (non-prefabricated) lintel reinforcement — no primary-source citation found yet;
-  the prefabricated default (this module's actual output) doesn't need it, but a monolithic
-  override path eventually will.
+- **Concrete cover table completion (NE 012/1-2022 Annex J) — partial DONE (2026-07-10, PR
+  #47)**. Wall + slab covers for the ordinary residential exposure cases now shipped as
+  named constants in `foundation.ts` next to the pre-existing `STRIP_FOOTING_COVER_MM = 40`:
+  `WALL_COVER_MM_XC1 = 25` and `SLAB_COVER_MM_XC1 = 25` (interior dry — 15 mm cmin,dur + 10 mm
+  Δcdev = 25 mm nominal, matching `TIE_COLUMN_COVER_MM`), `WALL_COVER_MM_XC2 = 35` and
+  `SLAB_COVER_MM_XC3 = 35` (cyclic-wet / exterior — 25 mm cmin,dur + 10 mm Δcdev). Values are
+  the EN 1992-1-1 Table 4.4N structural-class-S4 recommended figures, cross-checked in the
+  Cyprus National Annex + eurocodeapplied.com's cover calculator + Dlubal RF-CONCRETE
+  Members KB (identical values across three secondary sources; the official NE 012/1-2022
+  Annex J PDF systematically 403s in this environment, same block that hit every prior
+  module). **Nothing consumes these yet** — they exist for the future wall/slab
+  reinforcement modules to reuse without another research pass. Explicit `TODO(cover-table)`
+  gaps left in the code: XC4 (cyclic wet-dry, e.g. a slab under a rain-exposed floor —
+  likely 40 mm nominal, only one clean corroborating source found), XD/XS/XA
+  chloride/chemical classes (out of scope for ordinary residential today), and RO NA
+  confirmation of Δcdev = 10 mm (the recommended EN value the NA is reported not to
+  deviate from, but not directly citable from this environment).
+- **Monolithic (non-prefabricated) lintel reinforcement — DONE (2026-07-10, PR #47)**. The
+  "no primary-source citation" gap this bullet used to describe is now closed at the same
+  two-source-secondary bar every other law-module uses. New helpers in
+  `packages/bim-engine/src/confined-masonry.ts` next to `deriveLintelSpec`:
+  `deriveMonolithicLintelReinforcement` (`{ longitudinal: { barCount: 4, diameterMm: 12,
+  coverMm: 25 }, stirrup: { diameterMm: 6, spacingMm: 150, coverMm: 25 }, concreteClass:
+  'C16/20' }`), `deriveMonolithicLintelHeightMm` (`h ≥ L/5`, floored at 200 mm — matching
+  Encipedia's "for an opening of ~1.00m, h > 20cm" example), `deriveMonolithicLintelSpec`
+  (same shape as `deriveLintelSpec` with 400 mm bearing each side + `prefabricated: false`).
+  **Citations** (two independently-phrased searches converging on identical figures):
+  - Bar Ø12 mm minimum — Encipedia's CR2-1-1-1/2013 "Prevederi constructive" article
+    cross-checked in casasidesign.ro's minimum-reinforcement-diameters guide.
+  - 2 top + 2 bottom bars (4 total) — Encipedia + colegiu-diriginti-santier.ro's zidărie-
+    confinată design guidance ("cu 2 bare cu diametru minim 12mm" per side).
+  - Concrete class C16/20 — Encipedia (recommended for buiandrug monolit) + colegiu-
+    diriginti-santier.ro's zidărie-confinată article (same class).
+  - Minimum depth h ≥ L/5 — colegiu-diriginti-santier.ro + forum.misiuneacasa.ro (same
+    "old-standard masonry rule" repeated identically).
+  - Bearing 400 mm — colegiu-diriginti-santier.ro cross-checked in the Wienerberger
+    Porotherm technical brief (which cites 40 cm for monolithic and separately 25 cm for
+    its A12 prefabricated product — two different cases, both consistent).
+  - **Stirrup Ø6 @ 150 mm NOT independently cross-checked for monolithic lintels
+    specifically**. Value inherited from CR6-2013 confining-element practice
+    (`TIE_COLUMN_STIRRUP_*` / `centura.ts` — same Ø6@150), which is the correct fallback
+    since a monolithic lintel is often cast integral with the centură and shares its
+    stirrup detailing (Encipedia's "possibly tied to the ceiling's confining element" note).
+    Flagged in the code's citation-confidence block for engineer confirmation. The load-
+    derived shear-reinforcement calc per SR EN 1992-1-1 §9.2.2 remains deliberately out of
+    scope, same as everywhere else in the law-modules.
+  Not yet done: no caller uses these helpers yet — `Lintel.prefabricated: true` remains the
+  auto-provisioned default from `HousesService.getLintel`. A UI toggle / project-setting
+  override that flips a specific Lintel to monolithic (calling the new helpers instead of
+  `deriveLintelSpec`) is the next natural step but out of scope for this data-widening PR.
 - **Future feature (not started, explicitly deferred by the user until the law-module sequence
   finishes)**: an interactive editor where resizing a structural element (e.g. widening a door)
   correctly re-details the rebar running through/around it — including inserting a lap splice

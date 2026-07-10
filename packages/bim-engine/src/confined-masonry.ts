@@ -395,10 +395,10 @@ export interface LintelSpec {
 /**
  * Constructive-minimum lintel spec for one opening. Always prefabricated by
  * default (the cited common case) — a monolithic lintel is a project-
- * specific override this module doesn't decide, and its reinforcement
- * (bar count/diameter/stirrups) has no primary-source citation found for
- * this project yet, so it is deliberately not generated here (see
- * CLAUDE.md gap note) rather than guessed.
+ * specific override this module doesn't decide (a caller picks it by
+ * calling `deriveMonolithicLintelReinforcement` for the reinforcement
+ * spec + `deriveMonolithicLintelHeightMm` for the beam depth, and setting
+ * `prefabricated: false` on the resulting LintelSpec).
  */
 export function deriveLintelSpec(openingWidthMm: number, wallThicknessMm: number): LintelSpec {
   return {
@@ -406,5 +406,155 @@ export function deriveLintelSpec(openingWidthMm: number, wallThicknessMm: number
     widthMm: wallThicknessMm,
     bearingLengthMm: LINTEL_BEARING_LENGTH_MM,
     prefabricated: true,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Monolithic (cast-in-place) reinforced-concrete lintel — CR6-2013 + SR EN
+// 1992-1-1 §9.2 minimums, cross-checked in secondary sources
+// ---------------------------------------------------------------------------
+//
+// Rare in residential practice (a prefabricated lintel handles the ordinary
+// door/window case — see `deriveLintelSpec`) but common when a lintel spans a
+// non-standard opening or is cast monolithically with the floor's centură /
+// slab (the "possibly tied to the centură" case documented in Encipedia's
+// zidărie confinată notes). This helper covers only the constructive
+// minimums a caller can safely default to; the load-derived reinforcement a
+// specific span/load actually needs is a structural calculation this module
+// does not perform (same disclaimer every other law-module carries).
+//
+// CITATION-CONFIDENCE NOTE: official CR6-2013 / SR EN 1992-1-1 PDF hosts
+// (asro.ro, mdlpa.ro, encipedia.org/articole) systematically 403 in this
+// project's environment (same block that hit every prior module — see
+// CLAUDE.md). Values below come from two independently-phrased secondary-
+// source searches converging on identical figures:
+//   * Minimum longitudinal bar diameter Ø12 mm (top + bottom) — Encipedia's
+//     CR2-1-1-1/2013 "Prevederi constructive" article ("minimum diameter
+//     12mm for profiled steel") cross-checked in casasidesign.ro's
+//     minimum-reinforcement-diameters guide (same Ø12 mm floor for a
+//     bending element).
+//   * 2 top + 2 bottom bars — Encipedia + colegiu-diriginti-santier.ro's
+//     zidărie-confinată design guidance ("armare longitudinală de rezistență
+//     în părțile superioară și inferioară ale secțiunii, cu 2 bare cu
+//     diametru minim 12mm" per side).
+//   * Concrete class C16/20 — Encipedia (recommended for buiandrug monolit)
+//     cross-checked in colegiu-diriginti-santier.ro's zidărie-confinată
+//     article ("beton armat clasa C 16/20"). Note this is one class UP from
+//     the tie-column / centură C12/15 minimum — a lintel is a bending
+//     element carrying wall loads over the opening, not a confining tie.
+//   * Minimum depth ratio h ≥ L/5 — colegiu-diriginti-santier.ro's zidărie
+//     guidance ("h > L/5") cross-checked in forum.misiuneacasa.ro's
+//     buiandrugi-turnare thread (same ratio widely repeated as the "old
+//     masonry standard" rule of thumb). This is a geometric minimum, not a
+//     load-derived depth.
+//   * Bearing length ≥ 400 mm on each side — colegiu-diriginti-santier.ro
+//     ("lățimea de rezemare a buiandrugilor pe pereții de zidărie trebuie să
+//     fie mai mare de 40 cm") cross-checked in the Wienerberger Porotherm
+//     technical brief (which cites the same 40 cm figure for a MONOLITHIC
+//     lintel while separately specifying 250 mm for its prefabricated A12
+//     product — the two match, one per case).
+//   * Stirrup Ø6 mm @ 150 mm — NOT independently cross-checked for
+//     monolithic lintels specifically. The value is inherited from CR6-2013
+//     confining-element practice (see TIE_COLUMN_STIRRUP_* / centura.ts —
+//     same Ø6 @ 150 mm), which is the correct fallback here since a
+//     monolithic lintel is often cast integral with the centură and shares
+//     its stirrup detailing. Flagged for engineer confirmation; the load-
+//     derived shear reinforcement per SR EN 1992-1-1 §9.2.2 is a structural
+//     calculation this module does not perform.
+// As with every other seeded structural default in this project, a
+// structural engineer must confirm the exact CR6-2013 / SR EN 1992-1-1
+// figures against an official copy before construction use.
+
+export const MONOLITHIC_LINTEL_CONCRETE_CLASS = 'C16/20'
+export const MONOLITHIC_LINTEL_LONGITUDINAL_DIAMETER_MM = 12
+/** 2 top + 2 bottom bars: the standard-practice minimum for a shallow beam
+ *  over an opening in confined masonry. */
+export const MONOLITHIC_LINTEL_LONGITUDINAL_BAR_COUNT = 4
+export const MONOLITHIC_LINTEL_STIRRUP_DIAMETER_MM = 6
+export const MONOLITHIC_LINTEL_STIRRUP_SPACING_MM = 150
+/** Nominal cover for an interior-embedded XC1 confining beam element —
+ *  matches TIE_COLUMN_COVER_MM (both come from EN 1992-1-1 Table 4.4N XC1
+ *  structural class S4, cmin,dur 15 mm + Δcdev 10 mm). */
+export const MONOLITHIC_LINTEL_COVER_MM = 25
+/** Geometric minimum depth ratio: h >= L/5 (old-standard "masonry" rule
+ *  widely repeated in RO practice, not a load-derived depth). */
+export const MONOLITHIC_LINTEL_MIN_DEPTH_RATIO = 1 / 5
+/** Minimum bearing length each side (mm) — 40 cm per RO practice
+ *  guidance for monolithic lintels, larger than the 25 cm prefabricated
+ *  A12 datasheet bearing. */
+export const MONOLITHIC_LINTEL_BEARING_LENGTH_MM = 400
+
+export interface MonolithicLintelReinforcementSpec {
+  longitudinal: {
+    /** Same barCount arrangement as a tie-column's 4 fixed bars, but here
+     *  divided as 2 top + 2 bottom (bending element) rather than 4 corners. */
+    barCount: number
+    diameterMm: number
+    coverMm: number
+  }
+  stirrup: { diameterMm: number; spacingMm: number; coverMm: number }
+  concreteClass: string
+}
+
+/**
+ * Constructive-minimum reinforcement for a MONOLITHIC (cast-in-place)
+ * reinforced-concrete lintel over an opening in a masonry wall. Deliberately
+ * a floor — the load-derived bar diameter/count and shear-derived stirrup
+ * spacing a specific span/load actually needs is a structural calculation
+ * per SR EN 1992-1-1 §6/§9.2 that this module does not perform. Callers who
+ * need the LintelSpec geometry alongside the reinforcement should call this
+ * plus `deriveMonolithicLintelHeightMm` and set `prefabricated: false`.
+ *
+ * The two arguments (openingWidthM, wallThicknessMm) are accepted but not
+ * currently branched on — every span in the constructive-minimum regime
+ * gets the same 4×Ø12 + Ø6@150 arrangement. They are kept in the signature
+ * so a future step can size the reinforcement up for a long/loaded span
+ * without breaking callers.
+ */
+export function deriveMonolithicLintelReinforcement(
+  _openingWidthM: number,
+  _wallThicknessMm: number,
+): MonolithicLintelReinforcementSpec {
+  return {
+    longitudinal: {
+      barCount: MONOLITHIC_LINTEL_LONGITUDINAL_BAR_COUNT,
+      diameterMm: MONOLITHIC_LINTEL_LONGITUDINAL_DIAMETER_MM,
+      coverMm: MONOLITHIC_LINTEL_COVER_MM,
+    },
+    stirrup: {
+      diameterMm: MONOLITHIC_LINTEL_STIRRUP_DIAMETER_MM,
+      spacingMm: MONOLITHIC_LINTEL_STIRRUP_SPACING_MM,
+      coverMm: MONOLITHIC_LINTEL_COVER_MM,
+    },
+    concreteClass: MONOLITHIC_LINTEL_CONCRETE_CLASS,
+  }
+}
+
+/**
+ * Minimum monolithic lintel depth (h in mm), per the widely-cited h >= L/5
+ * old-standard masonry rule. Floored at 200 mm (a common practical minimum
+ * that matches Encipedia's "for an opening of ~1.00m, this results in
+ * h > 20cm" example). Load-derived depth is a structural calculation this
+ * module does not perform.
+ */
+export function deriveMonolithicLintelHeightMm(openingWidthMm: number): number {
+  return Math.max(200, Math.ceil(openingWidthMm * MONOLITHIC_LINTEL_MIN_DEPTH_RATIO))
+}
+
+/**
+ * Full geometry spec for a monolithic lintel: same shape as `deriveLintelSpec`
+ * but with the larger 400mm-each-side bearing length and `prefabricated:
+ * false`. Reinforcement comes separately from
+ * `deriveMonolithicLintelReinforcement`.
+ */
+export function deriveMonolithicLintelSpec(
+  openingWidthMm: number,
+  wallThicknessMm: number,
+): LintelSpec {
+  return {
+    lengthMm: openingWidthMm + 2 * MONOLITHIC_LINTEL_BEARING_LENGTH_MM,
+    widthMm: wallThicknessMm,
+    bearingLengthMm: MONOLITHIC_LINTEL_BEARING_LENGTH_MM,
+    prefabricated: false,
   }
 }

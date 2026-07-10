@@ -2,7 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma, type Opening, type Wall } from '@ai-home-designer/database'
 import {
   calculateBrickQuantity,
+  calculateLongitudinalRebarQuantity,
+  calculateStirrupQuantity,
+  deriveLintelSpec,
   type BrickModule,
+  type RebarBarSpec,
   type WallDimensions,
   type WallOpeningMm,
 } from '@ai-home-designer/bim-engine'
@@ -16,7 +20,18 @@ export interface CostItem {
   unitPrice: number
   /** Set on real bill-of-quantities lines derived from a Material — absent on the flat area-rate fallback lines. */
   standardRef?: string
+  /** Whether the seeded Material's `unitCostRON` has been checked against a real supplier quote (see Material.specSheet.priceVerified in the seed). */
   priceVerified?: boolean
+  /**
+   * Whether the geometric quantity itself traces to a cited default (as
+   * opposed to a convention-only default the user still has to confirm — e.g.
+   * `Roof.overhangVerified` on the roof line). Absent on lines where the
+   * quantity itself has no verification concept (wall assembly, foundation
+   * with a cited STAS 6054-77 locality, etc.).
+   */
+  verified?: boolean
+  /** Free-form note for the UI (e.g. "unverified overhang", "unverified locality"). */
+  notes?: string
 }
 
 // Default joint dimensions for brick-category materials whose specSheet
@@ -25,6 +40,22 @@ export interface CostItem {
 // piecesPerM2 (e.g. the Leier N+F default) skip this path entirely.
 const DEFAULT_BED_JOINT_MM = 12
 const DEFAULT_HEAD_JOINT_MM = 10
+
+// Storey height for tie-column/wall volume defaults when a Wall.height is
+// absent. Matches Wall.height's Prisma default (2.7m) and the 3D viewer's
+// LEVEL_HEIGHT_M — not a storey-height spec (see CLAUDE.md's "AI rooms →
+// generated walls" section).
+const DEFAULT_STOREY_HEIGHT_M = 2.7
+
+// Foundations and confining-element concrete/rebar all use these three
+// seeded generic-default materials (see packages/database/prisma/seed.ts).
+// Names must stay in sync with the seed.
+const MATERIAL_LEAN_CONCRETE = 'Beton de egalizare C8/10'
+const MATERIAL_FOUNDATION_CONCRETE = 'Beton C16/20'
+const MATERIAL_CONFINING_CONCRETE = 'Beton C12/15'
+const MATERIAL_REBAR = 'Oțel beton B500C'
+const MATERIAL_LINTEL = 'Buiandrug prefabricat'
+const MATERIAL_ROOF = 'Țiglă ceramică Tondach standard'
 
 @Injectable()
 export class CostsService {
@@ -57,15 +88,35 @@ export class CostsService {
     if (!house) throw new NotFoundException('House not found')
 
     const totalArea = house.totalArea ?? house.rooms.reduce((s, r) => s + r.area, 0)
+
+    // Real BOQ lines, category by category. Each helper falls back to an
+    // empty list when the underlying data isn't there yet (e.g. no walls
+    // → no perimeter → no foundation lines) — the flat area-rate for that
+    // category then stays in the breakdown as before.
     const wallBoq = await this.calculateWallAssemblyBoq(house.walls)
+    const foundationBoq = await this.calculateFoundationBoq(houseId, house.walls)
+    const structuralBoq = await this.calculateStructuralBoq(houseId, house.walls)
+    const lintelBoq = await this.calculateLintelBoq(houseId, house.walls)
+    const roofBoq = await this.calculateRoofBoq(houseId, house.walls)
+
     // Real per-wall-layer data now covers masonry/plastering/painting/insulation
     // more accurately than a flat per-m²-of-floor-area guess — drop those flat
-    // categories in favor of the real numbers once walls exist. Categories
-    // without a real BOQ source yet (foundation, roof, MEP, finishes...) keep
-    // the flat-rate rollup.
-    const flatCategoriesToReplace = wallBoq.length > 0
-      ? new Set(['masonry', 'plastering', 'painting', 'insulation'])
-      : new Set<string>()
+    // categories in favor of the real numbers once walls exist. Same idea
+    // for `structure` (once foundation BOQ is generated) and `roof` (once
+    // roof BOQ is generated). Categories without a real BOQ source yet
+    // (MEP, finishes, etc.) keep the flat-rate rollup.
+    const flatCategoriesToReplace = new Set<string>()
+    if (wallBoq.length > 0) {
+      for (const c of ['masonry', 'plastering', 'painting', 'insulation']) {
+        flatCategoriesToReplace.add(c)
+      }
+    }
+    if (foundationBoq.length > 0 || structuralBoq.length > 0) {
+      flatCategoriesToReplace.add('structure')
+    }
+    if (roofBoq.length > 0) {
+      flatCategoriesToReplace.add('roof')
+    }
 
     const flatCategories: CostItem[] = Object.entries(this.romanianRates)
       .filter(([category]) => !flatCategoriesToReplace.has(category))
@@ -77,7 +128,14 @@ export class CostsService {
         unitPrice: rate,
       }))
 
-    const breakdown: CostItem[] = [...flatCategories, ...wallBoq]
+    const breakdown: CostItem[] = [
+      ...flatCategories,
+      ...wallBoq,
+      ...foundationBoq,
+      ...structuralBoq,
+      ...lintelBoq,
+      ...roofBoq,
+    ]
     const total = breakdown.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
 
     await prisma.costEstimate.upsert({
@@ -129,6 +187,365 @@ export class CostsService {
     return lines
   }
 
+  /**
+   * Real strip-footing BOQ from the house's Foundation row (auto-provisioned
+   * via `HousesService.getFoundation` from STAS 6054-77 + NP 112-2014
+   * constructive minimums) and the ground-floor load-bearing wall perimeter.
+   * Emits four lines:
+   *   1. Lean concrete (`Beton de egalizare C8/10`) m³
+   *   2. Structural concrete (`Beton C16/20`) m³
+   *   3. Transverse (resistance) rebar (`Oțel beton B500C`) kg
+   *   4. Longitudinal (distribution) rebar (`Oțel beton B500C`) kg
+   * Returns `[]` when the house has no ground-floor load-bearing walls yet
+   * (no perimeter to compute a footing run from) — the flat `structure`
+   * area-rate then stays in the breakdown.
+   */
+  private async calculateFoundationBoq(
+    houseId: string,
+    walls: Wall[],
+  ): Promise<CostItem[]> {
+    const groundBearingWalls = walls.filter(
+      (w) => w.floor === 0 && (w.isExterior || w.isLoad),
+    )
+    if (groundBearingWalls.length === 0) return []
+    const perimeterM = groundBearingWalls.reduce(
+      (s, w) => s + Math.hypot(w.endX - w.startX, w.endY - w.startY),
+      0,
+    )
+    if (perimeterM <= 0) return []
+
+    const foundation = await this.housesService.getFoundation(houseId)
+    if (!foundation) return []
+
+    const widthM = foundation.widthMm / 1000
+    const depthM = foundation.depthMm / 1000
+    const leanConcreteThicknessM = foundation.assemblyLayers.find(
+      (l) => l.material.name === MATERIAL_LEAN_CONCRETE,
+    )?.thicknessMm
+    const leanConcreteVolumeM3 = ((leanConcreteThicknessM ?? 0) / 1000) * widthM * perimeterM
+    const structuralConcreteVolumeM3 = depthM * widthM * perimeterM
+
+    const [leanMat, structMat, rebarMat] = await Promise.all([
+      this.findMaterial(MATERIAL_LEAN_CONCRETE),
+      this.findMaterial(MATERIAL_FOUNDATION_CONCRETE),
+      this.findMaterial(MATERIAL_REBAR),
+    ])
+
+    const lines: CostItem[] = []
+
+    lines.push(
+      this.concreteLine('foundation-lean', leanMat, leanConcreteVolumeM3, foundation.depthVerified),
+    )
+    lines.push(
+      this.concreteLine('foundation-structural', structMat, structuralConcreteVolumeM3, foundation.depthVerified),
+    )
+
+    // Foundation rebar: two mats. TRANSVERSE bars (resistance, perpendicular
+    // to the wall) are spaced along the length; LONGITUDINAL bars
+    // (distribution, along the wall) span the length and are stacked across
+    // the width. Both flow through `calculateLongitudinalRebarQuantity` — for
+    // the transverse mat, the element's axes are swapped: bars along the
+    // "long axis" become bars across the footing width, so the returned
+    // barLength is the transverse span (widthMm) and the returned barCount is
+    // the number of transverse bars along the perimeter.
+    const perimeterMm = perimeterM * 1000
+    for (const spec of foundation.reinforcementSpecs) {
+      const barSpec: RebarBarSpec = {
+        diameterMm: spec.barDiameterMm,
+        spacingMm: spec.spacingMm,
+        coverMm: spec.coverMm,
+        role: spec.role,
+      }
+      const dims =
+        spec.role === 'TRANSVERSE'
+          ? { lengthMm: foundation.widthMm, widthMm: perimeterMm }
+          : { lengthMm: perimeterMm, widthMm: foundation.widthMm }
+      const qty = calculateLongitudinalRebarQuantity(dims, barSpec)
+      lines.push({
+        category: `foundation-rebar-${spec.role.toLowerCase()}`,
+        name: `${rebarMat.name} Ø${spec.barDiameterMm}`,
+        quantity: Math.round(qty.totalWeightKg * 100) / 100,
+        unit: 'kg',
+        unitPrice: rebarMat.unitCostRON,
+        standardRef: rebarMat.standardRef ?? undefined,
+        priceVerified: this.priceVerified(rebarMat),
+      })
+    }
+
+    return lines
+  }
+
+  /**
+   * Confined-masonry structural BOQ: tie-column (stâlpișor) + centură
+   * concrete and reinforcement (LONGITUDINAL + STIRRUP), per the CR6-2013
+   * modules already shipped in bim-engine. Each element emits one concrete
+   * line (`Beton C12/15`) and up to two rebar lines (`Oțel beton B500C`),
+   * aggregated across all tie-columns / all centuri respectively.
+   * Returns `[]` when the house has no walls yet (no tie-column or centura
+   * rows) — the flat `structure` area-rate then covers the whole category.
+   */
+  private async calculateStructuralBoq(
+    houseId: string,
+    walls: Wall[],
+  ): Promise<CostItem[]> {
+    if (walls.length === 0) return []
+    const [tieColumns, centuri] = await Promise.all([
+      this.housesService.getTieColumns(houseId),
+      this.housesService.getCenturi(houseId),
+    ])
+    if (tieColumns.length === 0 && centuri.length === 0) return []
+
+    const [confiningMat, rebarMat] = await Promise.all([
+      this.findMaterial(MATERIAL_CONFINING_CONCRETE),
+      this.findMaterial(MATERIAL_REBAR),
+    ])
+
+    const lines: CostItem[] = []
+
+    // Tie-columns: one per S1/S2/S3 placement, each 250×250 × storey height
+    // (uses the max wall height on the same floor, fallback 2.7m). Aggregate
+    // volume/rebar across all columns into a single line-per-category so the
+    // breakdown stays legible.
+    if (tieColumns.length > 0) {
+      const wallsByFloor = new Map<number, Wall[]>()
+      for (const w of walls) {
+        const arr = wallsByFloor.get(w.floor) ?? []
+        arr.push(w)
+        wallsByFloor.set(w.floor, arr)
+      }
+
+      let concreteM3 = 0
+      const rebarByDiameter = new Map<number, { role: string; kg: number }>()
+
+      for (const column of tieColumns) {
+        const floorWalls = wallsByFloor.get(column.floor) ?? []
+        const storeyHeightM = floorWalls.reduce(
+          (max, w) => Math.max(max, w.height),
+          0,
+        ) || DEFAULT_STOREY_HEIGHT_M
+        const crossSectionM = column.crossSectionMm / 1000
+        concreteM3 += crossSectionM * crossSectionM * storeyHeightM
+
+        for (const spec of column.reinforcementSpecs) {
+          if (spec.role === 'LONGITUDINAL') {
+            // Fixed corner-bar count (see confined-masonry.ts + `barCount`
+            // on ReinforcementSpec): `barCount` bars, each running the
+            // storey height minus 2× cover.
+            const barCount = spec.barCount ?? 4
+            const barLengthM = Math.max(0, storeyHeightM - (2 * spec.coverMm) / 1000)
+            const totalLengthM = barCount * barLengthM
+            const kg = totalLengthM * this.rebarKgPerMeter(spec.barDiameterMm)
+            const entry = rebarByDiameter.get(spec.barDiameterMm) ?? { role: 'LONGITUDINAL', kg: 0 }
+            entry.kg += kg
+            rebarByDiameter.set(spec.barDiameterMm, entry)
+          } else if (spec.role === 'STIRRUP') {
+            const qty = calculateStirrupQuantity(
+              {
+                lengthMm: storeyHeightM * 1000,
+                crossSectionAMm: column.crossSectionMm,
+                crossSectionBMm: column.crossSectionMm,
+              },
+              {
+                diameterMm: spec.barDiameterMm,
+                spacingMm: spec.spacingMm,
+                coverMm: spec.coverMm,
+                role: 'STIRRUP',
+              },
+            )
+            const entry = rebarByDiameter.get(spec.barDiameterMm) ?? { role: 'STIRRUP', kg: 0 }
+            entry.kg += qty.totalWeightKg
+            rebarByDiameter.set(spec.barDiameterMm, entry)
+          }
+        }
+      }
+
+      if (concreteM3 > 0) {
+        lines.push(
+          this.concreteLine('tie-column-concrete', confiningMat, concreteM3),
+        )
+      }
+      for (const [diameter, { role, kg }] of rebarByDiameter) {
+        lines.push({
+          category: `tie-column-rebar-${role.toLowerCase()}`,
+          name: `${rebarMat.name} Ø${diameter}`,
+          quantity: Math.round(kg * 100) / 100,
+          unit: 'kg',
+          unitPrice: rebarMat.unitCostRON,
+          standardRef: rebarMat.standardRef ?? undefined,
+          priceVerified: this.priceVerified(rebarMat),
+        })
+      }
+    }
+
+    // Centuri: one per load-bearing wall × floor level (see centura.ts). Each
+    // centura has real length (its host wall's length), width (wall thickness)
+    // and height (slab thickness × 1 or × 2 for exterior).
+    if (centuri.length > 0) {
+      const wallById = new Map(walls.map((w) => [w.id, w]))
+      let concreteM3 = 0
+      const rebarByDiameter = new Map<number, { role: string; kg: number }>()
+
+      for (const centura of centuri) {
+        const wall = wallById.get(centura.wallId)
+        if (!wall) continue
+        const wallLengthM = Math.hypot(wall.endX - wall.startX, wall.endY - wall.startY)
+        const heightM = centura.heightMm / 1000
+        const widthM = centura.widthMm / 1000
+        concreteM3 += heightM * widthM * wallLengthM
+
+        for (const spec of centura.reinforcementSpecs) {
+          if (spec.role === 'LONGITUDINAL') {
+            // barCount bars, each running the wall length minus 2× cover.
+            const barCount = spec.barCount ?? 4
+            const barLengthM = Math.max(0, wallLengthM - (2 * spec.coverMm) / 1000)
+            const totalLengthM = barCount * barLengthM
+            const kg = totalLengthM * this.rebarKgPerMeter(spec.barDiameterMm)
+            const entry = rebarByDiameter.get(spec.barDiameterMm) ?? { role: 'LONGITUDINAL', kg: 0 }
+            entry.kg += kg
+            rebarByDiameter.set(spec.barDiameterMm, entry)
+          } else if (spec.role === 'STIRRUP') {
+            const qty = calculateStirrupQuantity(
+              {
+                lengthMm: wallLengthM * 1000,
+                crossSectionAMm: centura.heightMm,
+                crossSectionBMm: centura.widthMm,
+              },
+              {
+                diameterMm: spec.barDiameterMm,
+                spacingMm: spec.spacingMm,
+                coverMm: spec.coverMm,
+                role: 'STIRRUP',
+              },
+            )
+            const entry = rebarByDiameter.get(spec.barDiameterMm) ?? { role: 'STIRRUP', kg: 0 }
+            entry.kg += qty.totalWeightKg
+            rebarByDiameter.set(spec.barDiameterMm, entry)
+          }
+        }
+      }
+
+      if (concreteM3 > 0) {
+        lines.push(
+          this.concreteLine('centura-concrete', confiningMat, concreteM3),
+        )
+      }
+      for (const [diameter, { role, kg }] of rebarByDiameter) {
+        lines.push({
+          category: `centura-rebar-${role.toLowerCase()}`,
+          name: `${rebarMat.name} Ø${diameter}`,
+          quantity: Math.round(kg * 100) / 100,
+          unit: 'kg',
+          unitPrice: rebarMat.unitCostRON,
+          standardRef: rebarMat.standardRef ?? undefined,
+          priceVerified: this.priceVerified(rebarMat),
+        })
+      }
+    }
+
+    return lines
+  }
+
+  /**
+   * Prefabricated lintel line: one `Buiandrug prefabricat` per door/window
+   * opening on the house (matching the confined-masonry module's stance —
+   * every opening gets a lintel by default). The Lintel DB row itself isn't
+   * needed to price this — the seeded material is the only price input, and
+   * the row's dimensions carry no unit-cost information (the material is
+   * seeded per-piece). Aggregated as one line with the total count.
+   */
+  private async calculateLintelBoq(houseId: string, walls: Wall[]): Promise<CostItem[]> {
+    if (walls.length === 0) return []
+    // Openings live on Wall rows; sum via the walls collection so we don't
+    // do a second query.
+    const openings = await prisma.opening.findMany({ where: { houseId } })
+    if (openings.length === 0) return []
+
+    const lintelMat = await this.findMaterial(MATERIAL_LINTEL)
+    // Sanity-check: the derived spec here mirrors what HousesService.getLintel
+    // would persist — same bim-engine primitive, no invented numbers. We
+    // deliberately don't create Lintel rows from the cost engine (a read-only
+    // BOQ shouldn't mutate structural data as a side effect).
+    for (const o of openings) {
+      const wall = walls.find((w) => w.id === o.wallId)
+      if (!wall) continue
+      deriveLintelSpec(o.width * 1000, wall.thickness * 1000)
+    }
+
+    return [
+      {
+        category: 'lintel',
+        name: lintelMat.name,
+        quantity: openings.length,
+        unit: 'buc',
+        unitPrice: lintelMat.unitCostRON,
+        standardRef: lintelMat.standardRef ?? undefined,
+        priceVerified: this.priceVerified(lintelMat),
+      },
+    ]
+  }
+
+  /**
+   * Ceramic-tile roof line: the topmost-floor footprint (from the exterior
+   * wall bounding box) is extended by `Roof.overhangM` on all four sides,
+   * and the resulting flat area is divided by `cos(pitch)` — a steeper roof
+   * needs more tile per m² of footprint. Emits one `Țiglă ceramică Tondach
+   * standard` line. `overhangVerified` flows to the line's `verified` flag
+   * (mirroring `Material.specSheet.priceVerified`'s surfacing pattern in the
+   * UI). Returns `[]` when there are no walls yet (no footprint to extend).
+   */
+  private async calculateRoofBoq(houseId: string, walls: Wall[]): Promise<CostItem[]> {
+    if (walls.length === 0) return []
+    const roof = await this.housesService.getRoof(houseId)
+    if (!roof) return []
+
+    const topFloor = walls.reduce((max, w) => Math.max(max, w.floor), 0)
+    const topWalls = walls.filter((w) => w.floor === topFloor && w.isExterior)
+    const source = topWalls.length > 0 ? topWalls : walls.filter((w) => w.floor === topFloor)
+    if (source.length === 0) return []
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const w of source) {
+      minX = Math.min(minX, w.startX, w.endX)
+      minY = Math.min(minY, w.startY, w.endY)
+      maxX = Math.max(maxX, w.startX, w.endX)
+      maxY = Math.max(maxY, w.startY, w.endY)
+    }
+    const footprintLengthM = Math.max(0, maxX - minX) + 2 * roof.overhangM
+    const footprintWidthM = Math.max(0, maxY - minY) + 2 * roof.overhangM
+    if (footprintLengthM <= 0 || footprintWidthM <= 0) return []
+
+    const pitchRad = (roof.pitchDeg * Math.PI) / 180
+    // FLAT roof: cos(0)=1, so this reduces to the flat footprint area — the
+    // 1/cos slope factor is only meaningful for a pitched roof.
+    const slopeFactor = roof.pitchDeg === 0 ? 1 : 1 / Math.cos(pitchRad)
+    const roofAreaM2 = footprintLengthM * footprintWidthM * slopeFactor
+
+    const roofMat = roof.material ?? (await this.findMaterial(MATERIAL_ROOF))
+    const priceVerified = this.priceVerified(roofMat)
+
+    const notes: string[] = []
+    if (!roof.overhangVerified) notes.push('unverified overhang')
+    if (!roof.pitchVerified) notes.push('unverified pitch')
+
+    return [
+      {
+        category: 'roof-covering',
+        name: roofMat.name,
+        quantity: Math.round(roofAreaM2 * 100) / 100,
+        unit: 'm²',
+        unitPrice: roofMat.unitCostRON,
+        standardRef: roofMat.standardRef ?? undefined,
+        priceVerified,
+        // Geometric verification: `pitchVerified` reflects whether the
+        // cited-default pitch is in play; `overhangVerified` reflects the
+        // (convention-only) overhang. Both must be true for the line's
+        // quantity to be "verified" end-to-end.
+        verified: roof.pitchVerified && roof.overhangVerified,
+        notes: notes.length > 0 ? notes.join('; ') : undefined,
+      },
+    ]
+  }
+
   private calculateLayerQuantity(
     unit: string,
     areaM2: number,
@@ -168,6 +585,46 @@ export class CostsService {
     }
     // M2 default — render, insulation, plaster, paint are all specified per m².
     return areaM2
+  }
+
+  /**
+   * SR 438-1:2012-class reinforcing steel weight per meter for a given
+   * diameter (mm). Matches bim-engine's calculateLongitudinalRebarQuantity /
+   * calculateStirrupQuantity density constant (7850 kg/m³) so the two paths
+   * stay in numerical agreement.
+   */
+  private rebarKgPerMeter(diameterMm: number): number {
+    const areaM2 = Math.PI * (diameterMm / 2000) ** 2
+    return areaM2 * 7850
+  }
+
+  private concreteLine(
+    category: string,
+    material: { name: string; unitCostRON: number; standardRef: string | null; specSheet: unknown },
+    volumeM3: number,
+    verified?: boolean,
+  ): CostItem {
+    return {
+      category,
+      name: material.name,
+      quantity: Math.round(volumeM3 * 1000) / 1000,
+      unit: 'm³',
+      unitPrice: material.unitCostRON,
+      standardRef: material.standardRef ?? undefined,
+      priceVerified: this.priceVerified(material),
+      verified,
+    }
+  }
+
+  private priceVerified(material: { specSheet: unknown }): boolean {
+    const spec = (material.specSheet ?? {}) as Record<string, unknown>
+    return spec.priceVerified === true
+  }
+
+  private async findMaterial(name: string) {
+    return prisma.material.findFirstOrThrow({
+      where: { name, source: 'GENERIC_DEFAULT' },
+    })
   }
 
   async getEstimate(houseId: string) {

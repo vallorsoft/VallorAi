@@ -82,16 +82,25 @@ export function useWallLayers(wallId: string | null) {
 
 export interface WallReinforcementSpec {
   id: string
-  role: 'LONGITUDINAL' | 'STIRRUP'
+  role: 'LONGITUDINAL' | 'STIRRUP' | 'TRANSVERSE'
   barDiameterMm: number
   spacingMm: number
   coverMm: number
   concreteClass: string
+  barCount: number | null
 }
 
 export async function fetchWallReinforcement(wallId: string): Promise<WallReinforcementSpec[]> {
   const res = await api.get(`/houses/walls/${wallId}/reinforcement`)
   return res.data as WallReinforcementSpec[]
+}
+
+export function useWallReinforcement(wallId: string | null) {
+  return useQuery({
+    queryKey: ['wall-reinforcement', wallId],
+    queryFn: () => fetchWallReinforcement(wallId as string),
+    enabled: !!wallId,
+  })
 }
 
 export interface ElementReinforcementSpec {
@@ -270,6 +279,75 @@ export function useUpdateRoof(houseId: string | null | undefined) {
       // The 3D viewer reads via its own useRoof hook — invalidate so it
       // re-fetches the new pitch/type.
       qc.invalidateQueries({ queryKey: ['roof', houseId] })
+    },
+  })
+}
+
+/**
+ * BOQ inspector data — mirrors the shape CostsService.estimateByArea returns.
+ * The `verified` / `notes` fields land on lines whose *geometric* quantity
+ * itself has a verification concept (roof overhang/pitch, foundation frost
+ * depth); the `priceVerified` flag reflects the seeded Material's price
+ * disclaimer. Both surface as small amber "unverified" chips in the panel.
+ */
+export interface CostBoqLine {
+  category: string
+  name: string
+  quantity: number
+  unit: string
+  unitPrice: number
+  standardRef?: string
+  priceVerified?: boolean
+  verified?: boolean
+  notes?: string
+}
+
+export interface CostEstimateResponse {
+  breakdown: CostBoqLine[]
+  total: number
+  currency: string
+}
+
+export function useCostEstimate(projectId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['cost-estimate', projectId],
+    queryFn: async () => {
+      const res = await api.get(`/costs/projects/${projectId}/estimate`)
+      return res.data as CostEstimateResponse
+    },
+    enabled: !!projectId,
+  })
+}
+
+/**
+ * Manual "Adaugă perete" toolbar mode wire-up. Payload matches
+ * HousesService.addWall's expected shape (start/end in meters, floor as a
+ * signed integer). On success, invalidates the house query so the new wall
+ * shows up in the canvas + toolbar floor-switcher + cost-estimate panel.
+ */
+export interface AddWallPayload {
+  startX: number
+  startY: number
+  endX: number
+  endY: number
+  floor: number
+  thickness?: number
+  height?: number
+  isExterior?: boolean
+}
+
+export function useAddWall(houseId: string | null | undefined, projectId: string | null | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: AddWallPayload) => {
+      const res = await api.post(`/houses/${houseId}/walls`, payload)
+      return res.data
+    },
+    onSuccess: () => {
+      if (projectId) {
+        qc.invalidateQueries({ queryKey: ['houses', projectId] })
+        qc.invalidateQueries({ queryKey: ['cost-estimate', projectId] })
+      }
     },
   })
 }

@@ -149,6 +149,78 @@ export const LEAN_CONCRETE_CLASS = 'C8/10'
 // confirm the exact Romanian national-annex figure before construction use.
 export const STRIP_FOOTING_COVER_MM = 40
 
+// ---------------------------------------------------------------------------
+// NE 012/1-2022 Annex J concrete cover table (partial) — cited-only entries
+// ---------------------------------------------------------------------------
+//
+// NE 012/1-2022 Annex J mirrors SR EN 1992-1-1 §4.4 Table 4.4N (cmin,dur)
+// with the Romanian national annex — the same durability-class-vs-exposure-
+// class matrix. Nominal cover cnom = cmin,dur + Δcdev; SR EN 1992-1-1 §4.4.1.3
+// recommends Δcdev = 10 mm (the value the RO NA does not override), and every
+// nominal cover constant in this codebase already applies that convention
+// (see STRIP_FOOTING_COVER_MM = 40 for the against-blinding case, and
+// TIE_COLUMN_COVER_MM = 25 for the XC1 interior-embedded case in
+// confined-masonry.ts). Structural class S4 is the recommended default for a
+// 50-year design working life, which is what an ordinary residential building
+// targets — everything below assumes S4 unless noted otherwise.
+//
+// CITATION-CONFIDENCE NOTE: NE 012/1-2022 Annex J's official PDF host
+// (mdlpa.ro, asro.ro, legislatie.just.ro) systematically 403s in this
+// project's environment (same block that hit every prior module — see
+// CLAUDE.md's "Romanian structural building-code law modules" section);
+// values below come from two independently-phrased secondary-source
+// searches converging on identical figures — Cyprus National Annex to
+// EN 1992-1-1 (structural class S4 row: XC1 15mm, XC2/XC3 25mm, XC4 30mm),
+// cross-checked in eurocodeapplied.com's cover calculator (same values)
+// and Dlubal's RF-CONCRETE Members knowledge base entry for structural
+// class S4 XC4 = 30mm cmin,dur. These are the EN 1992-1-1 recommended
+// Table 4.4N values; the RO national annex is documented in secondary
+// sources as not deviating from them for S4, but a structural engineer
+// must confirm against an official NE 012/1-2022 copy before construction
+// use, same "engineer must confirm" caveat every other law-module carries.
+
+// XC1 — dry or permanently wet interior element (a wall reinforcement inside
+// a rendered/interior masonry wall, out of any weather cycling). Nominal
+// cover = cmin,dur (15) + Δcdev (10) = 25 mm.
+export const WALL_COVER_MM_XC1 = 25
+
+// XC2 — wet, rarely dry: an ordinary case for a below-grade / retaining
+// masonry-wall reinforcement in contact with damp soil that dries only
+// occasionally. Nominal cover = cmin,dur (25) + Δcdev (10) = 35 mm.
+export const WALL_COVER_MM_XC2 = 35
+
+// SLAB_COVER_MM_XC1 — monolithic reinforced-concrete slab, interior floor.
+// Same XC1 exposure as an interior wall's reinforcement; nominal cover
+// = 15 + 10 = 25 mm. Numerically identical to the wall value on purpose —
+// the tie-column (`TIE_COLUMN_COVER_MM = 25` in confined-masonry.ts) also
+// uses this XC1 nominal cover, so all three "interior embedded element"
+// covers agree, as EN 1992-1-1 Table 4.4N intends.
+export const SLAB_COVER_MM_XC1 = 25
+
+// SLAB_COVER_MM_XC3 — monolithic reinforced-concrete slab, exterior /
+// moderate-humidity exposure (a roof-terrace slab, a garage-below slab
+// exposed to condensation, etc.). NE 012/1-2022 Annex J / EN 1992-1-1
+// Table 4.4N group XC2 and XC3 into the same cmin,dur = 25 mm row; nominal
+// cover = 25 + 10 = 35 mm, matching WALL_COVER_MM_XC2 exactly (they share
+// the Table 4.4N row).
+export const SLAB_COVER_MM_XC3 = 35
+
+// TODO(cover-table): NE 012/1-2022 Annex J entries deliberately NOT added
+// here — no converging pair of cited secondary sources found for these
+// specific RO-national-annex figures:
+//   * XC4 (cyclic wet-dry, e.g. a slab exposed to rain on top and a heated
+//     room below) — EN 1992-1-1 Table 4.4N gives cmin,dur = 30 mm and Cyprus
+//     NA agrees, so cnom = 40 mm is the likely value, but a second RO-
+//     specific corroboration is missing.
+//   * XD/XS/XA exposure classes (chloride and chemical attack) — irrelevant
+//     for an ordinary residential building today; add when the app grows
+//     coastal/underground/de-icing-salt use cases.
+//   * The Δcdev = 10 mm deviation is the EN 1992-1-1 recommended value; the
+//     RO NA is reported to keep it, but no direct primary-source citation
+//     was captured — the values above use Δcdev = 10 mm consistently with
+//     the pre-existing TIE_COLUMN_COVER_MM / STRIP_FOOTING_COVER_MM
+//     constants (which the app already relies on).
+
 // Structural footing concrete — NP 112-2014 / NE 012-2022 cite C16/20 as the
 // typical minimum for an ordinary residential strip footing; C20/25 (already
 // seeded for reinforced walls) is used where seismic/soil conditions call

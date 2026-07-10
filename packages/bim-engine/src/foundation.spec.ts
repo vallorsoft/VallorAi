@@ -5,6 +5,11 @@ import {
   deriveFoundationSpec,
   FALLBACK_FROST_DEPTH_MM,
   STRIP_FOOTING_MIN_WIDTH_MM,
+  STRIP_FOOTING_COVER_MM,
+  WALL_COVER_MM_XC1,
+  WALL_COVER_MM_XC2,
+  SLAB_COVER_MM_XC1,
+  SLAB_COVER_MM_XC3,
 } from './foundation'
 
 describe('foundation — law module 1 (STAS 6054-77 / NP 112-2014 constructive minimums)', () => {
@@ -82,6 +87,36 @@ describe('foundation — law module 1 (STAS 6054-77 / NP 112-2014 constructive m
       expect(spec.depthMm).toBe(FALLBACK_FROST_DEPTH_MM)
       expect(spec.depthVerified).toBe(false)
       expect(spec.widthMm).toBe(680)
+    })
+  })
+
+  describe('NE 012/1-2022 Annex J — cited nominal cover constants', () => {
+    // These constants exist to be reused by future wall / slab reinforcement
+    // modules; nothing consumes them yet, so this test is a specification
+    // guard rather than a behavior test — it locks in the two-source-cross-
+    // checked values against silent edits.
+    it('reports EN 1992-1-1 Table 4.4N S4 nominal cover (cmin,dur + Δcdev=10mm)', () => {
+      // XC1: cmin,dur 15mm + Δcdev 10mm = 25mm — matches TIE_COLUMN_COVER_MM.
+      expect(WALL_COVER_MM_XC1).toBe(25)
+      expect(SLAB_COVER_MM_XC1).toBe(25)
+      // XC2 & XC3 group into the same Table 4.4N row: cmin,dur 25mm + 10mm = 35mm.
+      expect(WALL_COVER_MM_XC2).toBe(35)
+      expect(SLAB_COVER_MM_XC3).toBe(35)
+    })
+
+    it('agrees on the interior-embedded XC1 cover across wall and slab', () => {
+      // A tie-column, an interior wall reinforcement mat, and an interior
+      // slab reinforcement mat all live in the same XC1 exposure — they must
+      // report identical nominal cover.
+      expect(WALL_COVER_MM_XC1).toBe(SLAB_COVER_MM_XC1)
+    })
+
+    it('the against-blinding footing cover stays higher than the XC1/XC2 covers', () => {
+      // EN 1992-1-1 §4.4.1.3(4): concrete cast against prepared ground /
+      // blinding gets a higher minimum (40mm) than an ordinary XC1/XC2
+      // embedded element — sanity check the ordering is preserved.
+      expect(STRIP_FOOTING_COVER_MM).toBeGreaterThan(WALL_COVER_MM_XC1)
+      expect(STRIP_FOOTING_COVER_MM).toBeGreaterThanOrEqual(WALL_COVER_MM_XC2)
     })
   })
 })

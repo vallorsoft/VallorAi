@@ -5,8 +5,18 @@ import {
   deriveTieColumnPlacements,
   deriveTieColumnReinforcement,
   deriveLintelSpec,
+  deriveMonolithicLintelReinforcement,
+  deriveMonolithicLintelHeightMm,
+  deriveMonolithicLintelSpec,
   openingConfinementThresholdSqm,
   MAX_TIE_COLUMN_SPACING_M,
+  MONOLITHIC_LINTEL_BEARING_LENGTH_MM,
+  MONOLITHIC_LINTEL_CONCRETE_CLASS,
+  MONOLITHIC_LINTEL_LONGITUDINAL_BAR_COUNT,
+  MONOLITHIC_LINTEL_LONGITUDINAL_DIAMETER_MM,
+  MONOLITHIC_LINTEL_STIRRUP_DIAMETER_MM,
+  MONOLITHIC_LINTEL_STIRRUP_SPACING_MM,
+  MONOLITHIC_LINTEL_COVER_MM,
   type WallSegment,
   type WallOpeningForConfinement,
 } from './confined-masonry'
@@ -270,6 +280,81 @@ describe('confined-masonry — law module 2 (CR6-2013 stâlpișori + buiandrug)'
         bearingLengthMm: 250,
         prefabricated: true,
       })
+    })
+  })
+
+  describe('deriveMonolithicLintelReinforcement (CR6-2013 + SR EN 1992-1-1 §9.2)', () => {
+    it('returns the cross-checked constructive minimums (4×Ø12 top+bottom, Ø6@150 stirrups, XC1 cover, C16/20)', () => {
+      // A 1.2m x 0.24m interior partition: any reasonable opening/wall
+      // combination produces the constructive-minimum arrangement, since the
+      // helper does not currently branch on span/load (see doc-comment).
+      expect(deriveMonolithicLintelReinforcement(1.2, 240)).toEqual({
+        longitudinal: {
+          barCount: MONOLITHIC_LINTEL_LONGITUDINAL_BAR_COUNT,
+          diameterMm: MONOLITHIC_LINTEL_LONGITUDINAL_DIAMETER_MM,
+          coverMm: MONOLITHIC_LINTEL_COVER_MM,
+        },
+        stirrup: {
+          diameterMm: MONOLITHIC_LINTEL_STIRRUP_DIAMETER_MM,
+          spacingMm: MONOLITHIC_LINTEL_STIRRUP_SPACING_MM,
+          coverMm: MONOLITHIC_LINTEL_COVER_MM,
+        },
+        concreteClass: MONOLITHIC_LINTEL_CONCRETE_CLASS,
+      })
+      // Sanity: the numeric literal we ship is exactly the CR6-2013 confining-
+      // element practice (Ø6@150) inherited into this element — see the
+      // module-level citation-confidence note.
+      expect(MONOLITHIC_LINTEL_STIRRUP_DIAMETER_MM).toBe(6)
+      expect(MONOLITHIC_LINTEL_STIRRUP_SPACING_MM).toBe(150)
+    })
+
+    it('yields the same output for every span/thickness input (constructive-minimum only)', () => {
+      // A larger opening/wall should NOT scale reinforcement up here — that
+      // is a load-derived calculation deliberately out of this module's scope.
+      expect(deriveMonolithicLintelReinforcement(2.4, 380)).toEqual(
+        deriveMonolithicLintelReinforcement(0.9, 240),
+      )
+    })
+
+    it('bar count is 4 (2 top + 2 bottom, the bending-element arrangement)', () => {
+      // A tie-column has 4 corner bars; a monolithic lintel also has 4 bars
+      // but divided as 2 top + 2 bottom. Numeric equality is a coincidence
+      // of the constructive minimums, not a shared meaning.
+      expect(MONOLITHIC_LINTEL_LONGITUDINAL_BAR_COUNT).toBe(4)
+    })
+  })
+
+  describe('deriveMonolithicLintelHeightMm (h >= L/5, floored at 200mm)', () => {
+    it('applies the L/5 rule for a wide opening', () => {
+      // 1500mm opening -> 1500/5 = 300mm.
+      expect(deriveMonolithicLintelHeightMm(1500)).toBe(300)
+      // 2500mm opening -> 500mm.
+      expect(deriveMonolithicLintelHeightMm(2500)).toBe(500)
+    })
+
+    it('floors at 200mm for a narrow opening (Encipedia example: 1.00m opening -> h > 20cm)', () => {
+      // 900mm opening -> 900/5 = 180mm, clamped to the 200mm floor.
+      expect(deriveMonolithicLintelHeightMm(900)).toBe(200)
+      // 1000mm opening -> 1000/5 = 200mm, exactly at the floor.
+      expect(deriveMonolithicLintelHeightMm(1000)).toBe(200)
+    })
+  })
+
+  describe('deriveMonolithicLintelSpec (400mm bearing, prefabricated:false)', () => {
+    it('uses the RO-practice 40cm bearing on each side and flags as not prefabricated', () => {
+      const spec = deriveMonolithicLintelSpec(900, 380)
+      expect(spec).toEqual({
+        lengthMm: 900 + 2 * MONOLITHIC_LINTEL_BEARING_LENGTH_MM,
+        widthMm: 380,
+        bearingLengthMm: MONOLITHIC_LINTEL_BEARING_LENGTH_MM,
+        prefabricated: false,
+      })
+    })
+
+    it('monolithic bearing (400mm) is larger than prefabricated bearing (250mm)', () => {
+      const mono = deriveMonolithicLintelSpec(900, 240)
+      const prefab = deriveLintelSpec(900, 240)
+      expect(mono.bearingLengthMm).toBeGreaterThan(prefab.bearingLengthMm)
     })
   })
 })

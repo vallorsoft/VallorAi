@@ -1026,6 +1026,24 @@ Full original architecture writeup (context, source table, detailed rationale pe
 in a session plan file outside this repo and did not persist — the above is the durable
 reference going forward. Keep this section updated as Steps 5–9 land.
 
+- **IFC2x3 export — BIM interoperability (2026-07-11, PR #56)**. `GET /exports/projects/:id/ifc`
+  returns a valid ISO 10303-21 STEP Physical File (IFC2x3 schema) importable by Revit, ArchiCAD,
+  FreeCAD, BIM Vision and any other IFC2x3-capable tool.
+  - `apps/api/src/modules/exports/ifc-generator.ts` — pure-TypeScript generator, zero external
+    dependencies. Produces a complete spatial hierarchy: IFCPROJECT → IFCSITE → IFCBUILDING →
+    one IFCBUILDINGSTOREY per floor → one IFCSPACE per room + one IFCWALL per wall, each with
+    real extruded-solid geometry via IFCEXTRUDEDAREASOLID + IFCRECTANGLEPROFILEDEF. IFC GUIDs
+    are 22-char random strings over the standard base64 charset. Wall orientation: local X along
+    the wall direction unit vector `(ux, uy, 0)`, local Z up — correctly rotates non-axis-
+    aligned walls. Room profile center at `(w/2, d/2)` so its bounding-box corner sits at the
+    local origin. Degenerate walls (length < 1mm) are silently skipped.
+  - `ExportsService.generateIfcForProject(projectId, userId)` — ownership-checked via `userId`
+    in the Prisma query; handles empty houses (no rooms/walls) with a valid hierarchy-only file.
+  - `EditorToolbar` — "Export IFC" / "IFC export" / "Export IFC" button (ro/hu/en) with a
+    loading/disabled state, identical pattern to the existing PDF export button.
+  - Two new i18n keys: `editor.toolExportIfc` / `editor.exportIfcLoading` in `Dictionary` +
+    all three locale files; TS `satisfies Dictionary` enforces completeness.
+
 ## Spec documents
 All 13 PDFs in `docs/materials/` are the source of truth.
 Never add functionality not described there.

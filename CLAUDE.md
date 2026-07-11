@@ -977,6 +977,51 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
     `vatAmount ≈ (materials + labor) × 0.19`, labor lines carry `priceVerified: false`, tax
     line is named `TVA 19%`.
 
+- **Lépcső / Scară (Staircase) BIM element (2026-07-11, PR #52)**. A full staircase element
+  following the exact same pattern as Foundation, TieColumn, and Centura — pure bim-engine
+  calc + Prisma model + manual migration + REST API + i18n + editor panel + 3D mesh.
+  - **`packages/bim-engine/src/stairs.ts`** (unit-tested): `deriveStaircaseSpec()` derives
+    riser count, riser height, tread depth, horizontal run, and Blondel check from a floor-
+    to-floor height. Algorithm: `riserCount = ceil(H / MAX_RISER_MM)` so no single riser
+    exceeds the code maximum; tread from Blondel formula `T = 630 - 2R`. Violations recorded
+    when tread < 250mm or width < 900mm.
+    **Citations** (secondary-corroborated, same bar as all other law modules):
+    - `MAX_RISER_MM = 200` — NP 057-2002 §5.6 (max residential riser). Secondary-corroborated
+      via encipedia.ro NP 057-2002 summary + multiple RO residential design guides.
+    - `MIN_TREAD_MM = 250` — NP 057-2002 §5.6 ("going" min tread). Same sources.
+    - `MIN_CLEAR_WIDTH_MM = 900` — STAS 2965-86 §3.1 / NP 057-2002 §5.6. Secondary-
+      corroborated via encipedia.ro + multiple RO residential design references.
+    - `BLONDEL_TARGET_MM = 630` — François Blondel (1675) formula, widely cited as the
+      residential comfort optimum in RO architectural textbooks + casasidesign.ro.
+    - Official STAS 2965-86 / NP 057-2002 PDFs systematically 403 in this environment (same
+      block as every prior law-module pass). All values secondary-corroborated; engineer
+      confirmation before construction use.
+  - **Prisma**: `Staircase` model on `House` (CASCADE delete, `houseId` index). Manual
+    migration `20260711120000_add_staircase`. Fields: floor, posX/posY, widthM, lengthM,
+    riserCount, riserHeightMm, treadDepthMm, handedness, isGenerated.
+  - **API**: `GET/POST/DELETE /houses/:id/staircases`, `DELETE /houses/:id/staircases/:id`.
+    **No auto-provisioning** — a single-storey house needs no staircase; the API never creates
+    one silently (unlike Foundation/TieColumns/Centuri). `createStaircase` calls
+    `deriveStaircaseSpec` and persists the derived geometry.
+  - **i18n**: `toolStaircase` + full `structuralInspector.staircase` section (title, empty,
+    addButton, floor, width, length, riserCount, riserHeight, treadDepth, horizontalRun,
+    blondelCheck, blondelTarget, handedness, handednessRight, handednessLeft, codeCompliant,
+    codeViolation, loading, deleteButton) in all 3 locale files. TypeScript enforces
+    completeness via `satisfies Dictionary`.
+  - **Editor UI**: `StaircasePanel.tsx` lists every staircase row with Blondel check (green/
+    red badge against 630mm target), riser/tread/width values, code-compliance badge
+    (NP 057-2002, red/green), handedness label, per-item delete, and an "add staircase" button
+    shown only for multi-storey houses. Wired into `EditorToolbar` (new
+    "Scară/Lépcső/Staircase" button, extending `StructuralPanel` union with `'staircase'`)
+    and `EditorLayout` (`panelTitle` + `renderRightPanel`).
+  - **3D viewer**: `StaircaseMesh.tsx` renders a staircase as stepped box slices — one
+    `BoxGeometry` per riser/tread pair, building the classic stair profile in +Y/+Z. Wired
+    into `HouseScene` via `useStaircases(house.id)`, positioned at `floorElevation(s.floor)`.
+  - **Hooks**: `StaircaseRow`, `useStaircases`, `useCreateStaircase`, `useDeleteStaircase`
+    in `useProjects.ts`.
+  - **E2E**: `apps/api/test/stairs.e2e-spec.ts` — 5 cases: empty list, geometry check for
+    3000mm floor (n=15, riser=200mm, tread=230mm), custom width, delete, multi-floor list.
+
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable
 reference going forward. Keep this section updated as Steps 5–9 land.

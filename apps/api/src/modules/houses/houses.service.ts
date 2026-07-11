@@ -10,6 +10,7 @@ import {
   deriveLintelSpec,
   deriveCenturaLevels,
   deriveCenturaReinforcement,
+  deriveStaircaseSpec,
   solveFloorPlan,
   generateOpenings,
   deriveRoofSpec,
@@ -878,5 +879,60 @@ export class HousesService {
         ],
       })
     }
+  }
+
+  // ─── Staircases ────────────────────────────────────────────────────────────
+
+  /**
+   * Returns all staircase rows for the house. Does NOT auto-provision —
+   * a house has no staircase until the user explicitly adds one (a single-
+   * storey house needs no staircase; the API must not invent one silently).
+   */
+  async getStaircases(houseId: string) {
+    return prisma.staircase.findMany({
+      where: { houseId },
+      orderBy: [{ floor: 'asc' }, { createdAt: 'asc' }],
+    })
+  }
+
+  /**
+   * Derives and persists a new staircase for the given floor. Floor-to-floor
+   * height defaults to LEVEL_HEIGHT_M × 1000 (2700 mm) which matches Wall
+   * height defaults and the 3D viewer's LEVEL_HEIGHT_M constant.
+   */
+  async createStaircase(
+    houseId: string,
+    data: {
+      floor: number
+      posX?: number
+      posY?: number
+      widthMm?: number
+      floorHeightMm?: number
+      handedness?: string
+    },
+  ) {
+    const floorHeightMm = data.floorHeightMm ?? 2700
+    const spec = deriveStaircaseSpec({ floorHeightMm, widthMm: data.widthMm })
+    return prisma.staircase.create({
+      data: {
+        houseId,
+        floor: data.floor,
+        posX: data.posX ?? 0,
+        posY: data.posY ?? 0,
+        widthM: spec.widthMm / 1000,
+        lengthM: spec.horizontalRunMm / 1000,
+        riserCount: spec.riserCount,
+        riserHeightMm: spec.riserHeightMm,
+        treadDepthMm: spec.treadDepthMm,
+        handedness: data.handedness ?? 'RIGHT',
+        isGenerated: false,
+      },
+    })
+  }
+
+  async removeStaircase(houseId: string, staircaseId: string) {
+    await prisma.staircase.delete({
+      where: { id: staircaseId, houseId },
+    })
   }
 }

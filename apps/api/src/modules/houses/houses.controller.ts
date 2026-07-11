@@ -114,4 +114,33 @@ export class HousesController {
   ) {
     return this.housesService.updateRoof(houseId, body, req.user.id)
   }
+
+  @Get(':id/staircases')
+  getStaircases(@Param('id') houseId: string) {
+    return this.housesService.getStaircases(houseId)
+  }
+
+  @Post(':id/staircases')
+  createStaircase(
+    @Param('id') houseId: string,
+    @Body()
+    body: {
+      floor: number
+      posX?: number
+      posY?: number
+      widthMm?: number
+      floorHeightMm?: number
+      handedness?: string
+    },
+  ) {
+    return this.housesService.createStaircase(houseId, body)
+  }
+
+  @Delete(':id/staircases/:staircaseId')
+  removeStaircase(
+    @Param('id') houseId: string,
+    @Param('staircaseId') staircaseId: string,
+  ) {
+    return this.housesService.removeStaircase(houseId, staircaseId)
+  }
 }

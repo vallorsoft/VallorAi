@@ -1,0 +1,25 @@
+-- CreateTable
+CREATE TABLE "Staircase" (
+    "id" TEXT NOT NULL,
+    "houseId" TEXT NOT NULL,
+    "floor" INTEGER NOT NULL DEFAULT 0,
+    "posX" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "posY" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "widthM" DOUBLE PRECISION NOT NULL DEFAULT 0.9,
+    "lengthM" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+    "riserCount" INTEGER NOT NULL DEFAULT 16,
+    "riserHeightMm" DOUBLE PRECISION NOT NULL DEFAULT 168.75,
+    "treadDepthMm" DOUBLE PRECISION NOT NULL DEFAULT 292.5,
+    "handedness" TEXT NOT NULL DEFAULT 'RIGHT',
+    "isGenerated" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Staircase_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "Staircase_houseId_idx" ON "Staircase"("houseId");
+
+-- AddForeignKey
+ALTER TABLE "Staircase" ADD CONSTRAINT "Staircase_houseId_fkey" FOREIGN KEY ("houseId") REFERENCES "House"("id") ON DELETE CASCADE ON UPDATE CASCADE;

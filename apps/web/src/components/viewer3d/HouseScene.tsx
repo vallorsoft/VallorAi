@@ -19,6 +19,8 @@ import { TieColumnInstances } from './TieColumnInstances'
 import { useTieColumnInstances } from './useTieColumnInstances'
 import { CenturaInstances } from './CenturaInstances'
 import { useCenturaInstances } from './useCenturaInstances'
+import { StaircaseMesh } from './StaircaseMesh'
+import { useStaircases } from '@/hooks/useProjects'
 import { useLOD } from './useLOD'
 
 /**
@@ -122,6 +124,7 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
   const showCentura = !centura.computing && centura.pools.length > 0
   const { data: roof } = useRoof(house.id)
   const roofFootprint = useRoofFootprint(house)
+  const { data: staircases } = useStaircases(house.id)
 
   return (
     <group position={[-centerX, 0, -centerZ]}>
@@ -174,6 +177,10 @@ export function HouseScene({ house, lowPerfMode = false }: HouseSceneProps) {
           <group key={pool.key} position-y={floorElevation(pool.level)}>
             <CenturaInstances pool={pool} />
           </group>
+        ))}
+      {staircases &&
+        staircases.map((s) => (
+          <StaircaseMesh key={s.id} staircase={s} elevationY={floorElevation(s.floor)} />
         ))}
       {roof && roofFootprint && (
         <RoofMesh

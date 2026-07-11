@@ -1026,6 +1026,44 @@ Full original architecture writeup (context, source table, detailed rationale pe
 in a session plan file outside this repo and did not persist — the above is the durable
 reference going forward. Keep this section updated as Steps 5–9 land.
 
+## Project collaboration (2026-07-11, PR #54)
+
+Role-based multi-user access on top of the previously single-owner project model.
+
+- **Data model**: `ProjectMember` (Prisma) — `projectId` + `userId` + `ProjectMemberRole` (OWNER / EDITOR /
+  VIEWER) + `invitedBy` + `invitedAt` + `acceptedAt` (null = pending). Unique index on
+  `(projectId, userId)`. Manual migration `20260711150000_add_project_members`. Cascade-deletes with
+  the parent project. Relations added to `User.projectMemberships` and `Project.members`.
+
+- **API** (`apps/api/src/modules/projects/`):
+  - `ProjectsService.assertProjectAccess(projectId, userId, requiredRole)` — checks ownership first
+    (the original `assertOwnership` is untouched); falls through to a `ProjectMember` row with
+    `acceptedAt` set and a role-hierarchy comparison (`MEMBER_ROLE_ORDER` index). 404 vs 403
+    distinguished correctly.
+  - `findAll(userId)` — replaces the old `findAllByUser`; now returns owned projects merged with
+    accepted-membership shared projects, sorted by `updatedAt`. Shared entries carry `memberRole`.
+  - `getProjectMembers`, `inviteMember`, `acceptInvite` (idempotent), `removeMember`.
+  - Four new endpoints on `ProjectsController`: `GET/POST /projects/:id/members`,
+    `POST /projects/:id/members/accept`, `DELETE /projects/:id/members/:userId`.
+
+- **Web** (`apps/web/src/`):
+  - `StructuralPanel` union extended with `'collaboration'`.
+  - `useProjectMembers` / `useInviteMember` / `useAcceptInvite` / `useRemoveMember` in
+    `hooks/useProjects.ts`.
+  - `CollaborationPanel.tsx` — member list (name, email, role, pending badge) + invite-by-email
+    form with role picker (owner-gated; API enforces on the server too) + per-member remove button
+    for non-OWNER rows. Follows the same structural-panel pattern as FoundationPanel et al.
+  - `EditorToolbar` — new "Team / Csapat / Echipă" button at the end of `structuralTools`.
+  - `EditorLayout` — `panelTitle` + `renderRightPanel` cases for `'collaboration'`.
+
+- **i18n**: `collaboration.*` (12 keys: title, members, inviteEmail, inviteRole, inviteButton,
+  roleOwner, roleEditor, roleViewer, removeButton, pendingInvite, noMembers, toolCollab) added to
+  `Dictionary` in `types.ts` and all three locale files (ro / hu / en); `satisfies Dictionary`
+  enforces completeness at compile time.
+
+- **E2E**: `apps/api/test/collaboration.e2e-spec.ts` — 5 cases: empty member list, invite by
+  email, accept invite, shared project appears in `findAll`, remove member leaves list empty.
+
 ## Spec documents
 All 13 PDFs in `docs/materials/` are the source of truth.
 Never add functionality not described there.

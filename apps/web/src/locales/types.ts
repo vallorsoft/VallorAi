@@ -89,6 +89,8 @@ export interface Dictionary {
     toolAddRoom: string
     toolAddWall: string
     toolCostBoq: string
+    toolExportPdf: string
+    exportPdfLoading: string
     toolView2d: string
     toolView3d: string
     addWallHintFirstClick: string

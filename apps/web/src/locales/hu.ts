@@ -91,6 +91,8 @@ export const hu = {
     toolAddRoom: 'Szoba hozzáadása',
     toolAddWall: 'Fal hozzáadása',
     toolCostBoq: 'Költségvetés',
+    toolExportPdf: 'PDF export',
+    exportPdfLoading: 'Generálás...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Kattints a fal kezdőpontjához',

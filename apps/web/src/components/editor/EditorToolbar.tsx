@@ -1,8 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { useProjectStore } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
 import type { Dictionary } from '@/locales'
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'
 
 function floorLabel(floor: number, t: Dictionary) {
   if (floor === 0) return t.editor.floorGround
@@ -22,7 +25,32 @@ export function EditorToolbar() {
     setActiveFloor,
     structuralPanel,
     setStructuralPanel,
+    activeProjectId,
   } = useProjectStore()
+
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const handleDownloadPdf = async () => {
+    if (!activeProjectId || pdfLoading) return
+    setPdfLoading(true)
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const response = await fetch(
+        `${BASE_URL}/exports/projects/${activeProjectId}/floor-plan-pdf`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      )
+      if (!response.ok) throw new Error('PDF generation failed')
+      const blob = await response.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = 'alaprajz.pdf'
+      a.click()
+      URL.revokeObjectURL(objUrl)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   const tools = [
     { mode: 'select' as const, label: t.editor.toolSelect, icon: '↖' },
@@ -87,6 +115,15 @@ export function EditorToolbar() {
             {tool.label}
           </button>
         ))}
+        <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden />
+        <button
+          onClick={handleDownloadPdf}
+          disabled={pdfLoading}
+          title={t.editor.toolExportPdf}
+          className="px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {pdfLoading ? t.editor.exportPdfLoading : t.editor.toolExportPdf}
+        </button>
       </div>
 
       <div className="flex items-center gap-2 shrink-0">

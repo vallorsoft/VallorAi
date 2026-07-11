@@ -1082,6 +1082,30 @@ reference going forward. Keep this section updated as Steps 5–9 land.
   - Two new i18n keys: `editor.toolExportIfc` / `editor.exportIfcLoading` in `Dictionary` +
     all three locale files; TS `satisfies Dictionary` enforces completeness.
 
+- **DTAC permit document PDF export (2026-07-11, PR #58)**. `GET /exports/projects/:id/permit-doc`
+  returns an A4 PDF suitable as a DTAC (Documentație Tehnică pentru Autorizarea Construirii) summary.
+  - `apps/api/src/modules/exports/permit-doc-pdf.ts` — PDFKit generator (zero runtime deps beyond
+    PDFKit, already installed). Layout: dark header band with project name/date/address/owner; technical
+    data section (total area, floor count, room count, wall count); room list table with alternating-row
+    shading; permit-readiness percentage meter bar; compliance section with colour-coded lines
+    (ERROR=#c0392b red, WARNING=#e67e22 orange, passed rules in #27ae60 green); legal disclaimer
+    footer ("for informational purposes only — consult a licensed architect"). ASCII-safe text
+    throughout (PDFKit default font encoding; Romanian diacritics appear as their ASCII equivalents).
+  - `ExportsService.generatePermitDocForProject(projectId, userId)` — ownership-checked via
+    `ProjectsService.assertOwnership`; loads project + plot + house + rooms + walls (with layers +
+    openings); calls `RulesService.validate()` for the full livability/energy/fire/accessibility rule
+    set; maps `ValidationViolation.severity === 'INFO'` to WARNING (PDF interface has ERROR/WARNING
+    only); `passedRules` (string[] of rule codes) mapped to `{ ruleId, message }` objects. Empty-house
+    path returns a valid PDF with 0 rooms and `permitReadiness: 0`.
+  - `ExportsModule` now imports `ProjectsModule` and `RulesModule` so NestJS DI resolves both
+    injected services.
+  - `EditorToolbar.tsx` — "DTAC PDF" button (ro/hu/en identical label) following the exact same
+    loading/disabled pattern as the IFC and floor-plan PDF buttons; downloads `dtac-rezumat.pdf`.
+  - Two new i18n keys: `editor.toolExportPermitDoc` / `editor.exportPermitDocLoading` in `Dictionary`
+    and all three locale files; TS `satisfies Dictionary` enforces completeness.
+  - E2E: `apps/api/test/permit-doc.e2e-spec.ts` — 3 cases: project with 3 rooms → 200 + PDF magic
+    bytes `%PDF`; empty house (no rooms) → 200 + valid PDF; different user → 403 Forbidden.
+
 ## Spec documents
 All 13 PDFs in `docs/materials/` are the source of truth.
 Never add functionality not described there.

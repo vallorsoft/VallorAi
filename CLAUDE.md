@@ -1082,6 +1082,43 @@ reference going forward. Keep this section updated as Steps 5–9 land.
   - Two new i18n keys: `editor.toolExportIfc` / `editor.exportIfcLoading` in `Dictionary` +
     all three locale files; TS `satisfies Dictionary` enforces completeness.
 
+- **MEP alapmodul — installációs pontok szobánként (2026-07-11, PR #61)**. Full MEP
+  (Mechanical, Electrical, Plumbing) base module following the same pattern as Foundation /
+  TieColumns / Centuri / Staircase — pure bim-engine calc + Prisma model + migration + REST
+  API (auto-provisioning) + E2E tests + frontend panel + i18n in all 3 locales.
+  - **`packages/bim-engine/src/mep.ts`** (27 unit tests in `mep.spec.ts`): `classifyRoomForMep`
+    (EN/RO/HU keyword classifier, longest-match, same pattern as `classifyRoomZone`) +
+    `deriveMepPointsForRoom` → `MepPointSpec[]`. Standards:
+    - **I 9-2015** (sanitary installations, secondary-corroborated via instalatiiSanitare.ro +
+      encipedia.ro): BATHROOM 2 WATER_SUPPLY / 2 HOT_WATER_SUPPLY / 2 DRAIN; TOILET 1 cold /
+      1 drain (no hot); KITCHEN 2 cold (sink + washing-machine pre-provision) / 1 hot / 1 drain;
+      UTILITY 2 cold / 1 hot / 2 drain.
+    - **NTE 007/08/00 §4.3 + PE 155/92 §5.2** (electrical, secondary-corroborated via
+      electrica.ro + encipedia.ro + instalatiielectrice.ro): BATHROOM 1 IP44 outlet (zone 2,
+      ≥60 cm from water source); KITCHEN / LIVING_ROOM 4 outlets; BEDROOM 3 outlets; HALLWAY /
+      UTILITY / OTHER 1–2 outlets; TOILET 0 outlets (too small for IP44 zone). Every room: 1
+      SWITCH + 1 LIGHTING_POINT. Official PDFs 403 in this environment — same secondary-
+      corroborated confidence bar as all other law modules; MEP engineer confirmation required
+      before construction use.
+  - **Prisma + migration**: `MepPointType` enum (WATER_SUPPLY / HOT_WATER_SUPPLY / DRAIN /
+    ELECTRICAL_OUTLET / SWITCH / LIGHTING_POINT) + `MepPoint` model linked to both `House`
+    and `Room` (cascade delete, indexed). Migration `20260711160000_add_mep_points`.
+  - **API**: `HousesService.getMepPoints` auto-provisions on first GET (idempotent — if rows
+    already exist, returns them). `regenerateMepPoints` deletes + re-derives all rows (call
+    after room type changes). `GET /houses/:id/mep` + `POST /houses/:id/mep/regenerate`.
+  - **E2E** (`apps/api/test/mep.e2e-spec.ts`): 4 cases — BATHROOM auto-provision water+elec
+    with I 9-2015 / NTE 007 citations, idempotency, KITCHEN water+electrical counts, regenerate
+    after room type change.
+  - **`MepPanel.tsx`**: room-grouped inspector, type badges (blue=water, yellow=electrical),
+    standard citation per row, regenerate button. Reads `useMepPoints(house?.id)` from the
+    project store (same pattern as FoundationPanel). `useRegenerateMep` hook invalidates the
+    `['mep-points', houseId]` query key on success.
+  - **i18n**: `mep` section in `types.ts` (TS `satisfies Dictionary` enforces completeness) +
+    all three locale files (ro: Instalații / hu: Gépészet / en: MEP). 12 keys total.
+  - **Editor wiring**: `StructuralPanel` union += `'mep'`; toolbar "Instalații/Gépészet/MEP"
+    button in `EditorToolbar`; `panelTitle` + `renderRightPanel` `'mep'` cases in
+    `EditorLayout`.
+
 - **Project task management (2026-07-11, PR #59)**. Full CRUD task module for project teams.
   - **Prisma**: `ProjectTask` model with `TaskStatus` enum (TODO/IN_PROGRESS/DONE/CANCELLED)
     and `TaskPriority` enum (LOW/MEDIUM/HIGH). FK to `Project` (CASCADE delete), nullable FK

@@ -40,3 +40,6 @@ packages/database/src/generated
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Claude Code internal
+.claude/

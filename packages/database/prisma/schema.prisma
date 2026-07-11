@@ -52,6 +52,7 @@ model User {
   sessions           Session[]
   passwordResetTokens PasswordResetToken[]
   projectMemberships ProjectMember[]
+  assignedTasks      ProjectTask[] @relation("AssignedTasks")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -132,6 +133,7 @@ model Project {
   costEstimate CostEstimate?
   versions    ProjectVersion[]
   members     ProjectMember[]
+  tasks       ProjectTask[]
   currentVersionId String?
 
   createdAt DateTime @default(now())
@@ -156,6 +158,42 @@ model ProjectMember {
   @@unique([projectId, userId])
   @@index([userId])
   @@index([projectId])
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// A task attached to a project. EDITOR and OWNER can create/update/delete;
+// VIEWERs can only read. `assignedToId` must be a project member or owner.
+// `completedAt` is set automatically when status transitions to DONE and
+// cleared when it transitions away from DONE.
+model ProjectTask {
+  id           String       @id @default(cuid())
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  assignedToId String?
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  dueDate      DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([projectId])
+  @@index([assignedToId])
 }
 
 model Plot {

@@ -341,4 +341,18 @@ export const en = {
     saving: 'Saving...',
     accessDenied: "You don't have access to this page.",
   },
+  collaboration: {
+    title: 'Collaboration',
+    members: 'Team members',
+    inviteEmail: 'Email address',
+    inviteRole: 'Role',
+    inviteButton: 'Invite',
+    roleOwner: 'Owner',
+    roleEditor: 'Editor',
+    roleViewer: 'Viewer',
+    removeButton: 'Remove',
+    pendingInvite: 'Pending invitation',
+    noMembers: 'No members yet',
+    toolCollab: 'Team',
+  },
 } satisfies Dictionary

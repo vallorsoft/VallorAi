@@ -428,6 +428,72 @@ export function useConversation(projectId: string) {
   })
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Collaboration hooks
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ProjectMemberRow {
+  id: string
+  projectId: string
+  userId: string
+  role: 'OWNER' | 'EDITOR' | 'VIEWER'
+  invitedBy: string | null
+  invitedAt: string
+  acceptedAt: string | null
+  user: { id: string; name: string; email: string }
+}
+
+export function useProjectMembers(projectId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['project-members', projectId],
+    queryFn: async () => {
+      const res = await api.get(`/projects/${projectId}/members`)
+      return res.data as ProjectMemberRow[]
+    },
+    enabled: !!projectId,
+  })
+}
+
+export function useInviteMember(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: { email: string; role: 'EDITOR' | 'VIEWER' }) => {
+      const res = await api.post(`/projects/${projectId}/members/invite`, data)
+      return res.data as ProjectMemberRow
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['project-members', projectId] })
+    },
+  })
+}
+
+export function useAcceptInvite(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/projects/${projectId}/members/accept`, {})
+      return res.data
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['project-members', projectId] })
+      void qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
+export function useRemoveMember(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (targetUserId: string) => {
+      const res = await api.delete(`/projects/${projectId}/members/${targetUserId}`)
+      return res.data
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['project-members', projectId] })
+    },
+  })
+}
+
 interface Project {
   id: string
   name: string

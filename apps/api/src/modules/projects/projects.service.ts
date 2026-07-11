@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
 
@@ -12,6 +17,9 @@ type HouseSnapshot = {
   walls?: WallSnapshot[]
   openings?: OpeningSnapshot[]
 }
+
+const MEMBER_ROLE_ORDER = ['VIEWER', 'EDITOR', 'OWNER'] as const
+type MemberRole = (typeof MEMBER_ROLE_ORDER)[number]
 
 @Injectable()
 export class ProjectsService {
@@ -28,12 +36,78 @@ export class ProjectsService {
     return project
   }
 
+  /**
+   * Flexible access check — satisfies both ownership and ProjectMember-based
+   * access. OWNER-level callers (the project's creator) always pass regardless
+   * of the required role. Member callers must have acceptedAt set and at least
+   * the required role in the hierarchy (VIEWER < EDITOR < OWNER).
+   */
+  async assertProjectAccess(
+    projectId: string,
+    userId: string,
+    requiredRole: MemberRole = 'VIEWER',
+  ) {
+    // 1. Actual project creator — all roles satisfied automatically.
+    const owned = await prisma.project.findFirst({ where: { id: projectId, userId } })
+    if (owned) return owned
+
+    // Ensure the project exists for proper 404 vs 403 distinction.
+    const exists = await prisma.project.findUnique({ where: { id: projectId } })
+    if (!exists) throw new NotFoundException('Project not found')
+
+    // 2. Check membership.
+    const member = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+      include: { project: true },
+    })
+    if (!member || !member.acceptedAt)
+      throw new ForbiddenException('Nincs hozzáférés ehhez a projekthez')
+
+    const memberRoleIndex = MEMBER_ROLE_ORDER.indexOf(member.role as MemberRole)
+    const requiredRoleIndex = MEMBER_ROLE_ORDER.indexOf(requiredRole)
+    if (memberRoleIndex < requiredRoleIndex)
+      throw new ForbiddenException('Nincs megfelelő jogosultság')
+
+    return member.project
+  }
+
   findAllByUser(userId: string) {
     return prisma.project.findMany({
       where: { userId },
       include: { plot: true, budget: true },
       orderBy: { updatedAt: 'desc' },
     })
+  }
+
+  /**
+   * Returns all projects accessible to the user — owned projects plus shared
+   * projects where the user has accepted an invitation. Shared entries carry an
+   * extra `memberRole` field so the UI can badge them differently.
+   */
+  async findAll(userId: string) {
+    const [ownProjects, memberships] = await Promise.all([
+      prisma.project.findMany({
+        where: { userId },
+        include: { plot: true, budget: true },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.projectMember.findMany({
+        where: { userId, acceptedAt: { not: null } },
+        include: { project: { include: { plot: true, budget: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
+
+    const ownIds = new Set(ownProjects.map((p) => p.id))
+    const sharedProjects = memberships
+      .filter((m) => !ownIds.has(m.projectId))
+      .map((m) => ({ ...m.project, memberRole: m.role as string }))
+
+    const combined = [...ownProjects, ...sharedProjects]
+    combined.sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    )
+    return combined
   }
 
   async findOne(id: string, userId: string) {
@@ -168,5 +242,60 @@ export class ProjectsService {
     })
 
     return this.projectVersions.snapshotHouse(house.id, userId, `Restored from ${versionId}`)
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Collaboration / ProjectMember helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getProjectMembers(projectId: string, requesterId: string) {
+    await this.assertProjectAccess(projectId, requesterId, 'VIEWER')
+    return prisma.projectMember.findMany({
+      where: { projectId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+  }
+
+  async inviteMember(
+    projectId: string,
+    invitedByUserId: string,
+    email: string,
+    role: 'EDITOR' | 'VIEWER',
+  ) {
+    // Only the project owner can invite others.
+    await this.assertOwnership(projectId, invitedByUserId)
+
+    const invitedUser = await prisma.user.findUnique({ where: { email } })
+    if (!invitedUser)
+      throw new NotFoundException(`Nem található felhasználó ezzel az email-lel: ${email}`)
+    if (invitedUser.id === invitedByUserId)
+      throw new BadRequestException('Saját magát nem hívhatja meg')
+
+    return prisma.projectMember.upsert({
+      where: { projectId_userId: { projectId, userId: invitedUser.id } },
+      create: { projectId, userId: invitedUser.id, role, invitedBy: invitedByUserId },
+      update: { role },
+    })
+  }
+
+  async acceptInvite(projectId: string, userId: string) {
+    const member = await prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    })
+    if (!member) throw new NotFoundException('Meghívó nem található')
+    if (member.acceptedAt) return member // already accepted — idempotent
+    return prisma.projectMember.update({
+      where: { id: member.id },
+      data: { acceptedAt: new Date() },
+    })
+  }
+
+  async removeMember(projectId: string, requesterId: string, targetUserId: string) {
+    // Only the owner can remove members.
+    await this.assertOwnership(projectId, requesterId)
+    await prisma.projectMember.deleteMany({ where: { projectId, userId: targetUserId } })
   }
 }

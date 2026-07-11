@@ -14,7 +14,7 @@ export class ProjectsController {
 
   @Get()
   findAll(@Request() req: { user: { id: string } }) {
-    return this.projectsService.findAllByUser(req.user.id)
+    return this.projectsService.findAll(req.user.id)
   }
 
   @Get(':id')
@@ -83,5 +83,37 @@ export class ProjectsController {
     @Request() req: { user: { id: string } },
   ) {
     return this.projectsService.restoreVersion(id, versionId, req.user.id)
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Collaboration endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+
+  @Get(':id/members')
+  getMembers(@Param('id') id: string, @Request() req: { user: { id: string } }) {
+    return this.projectsService.getProjectMembers(id, req.user.id)
+  }
+
+  @Post(':id/members/invite')
+  inviteMember(
+    @Param('id') id: string,
+    @Body() body: { email: string; role: 'EDITOR' | 'VIEWER' },
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectsService.inviteMember(id, req.user.id, body.email, body.role)
+  }
+
+  @Post(':id/members/accept')
+  acceptInvite(@Param('id') id: string, @Request() req: { user: { id: string } }) {
+    return this.projectsService.acceptInvite(id, req.user.id)
+  }
+
+  @Delete(':id/members/:userId')
+  removeMember(
+    @Param('id') id: string,
+    @Param('userId') targetUserId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectsService.removeMember(id, req.user.id, targetUserId)
   }
 }

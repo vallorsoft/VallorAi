@@ -60,7 +60,7 @@ export interface House {
  * mirroring how selectRoom/selectWall already reset each other. Opening
  * selection (for the lintel panel) has the same shape as room/wall — one id.
  */
-export type StructuralPanel = 'foundation' | 'tie-columns' | 'centuri' | 'roof' | 'cost-boq' | 'staircase' | 'collaboration' | 'tasks'
+export type StructuralPanel = 'foundation' | 'tie-columns' | 'centuri' | 'roof' | 'cost-boq' | 'staircase' | 'collaboration' | 'tasks' | 'mep'
 
 /**
  * In-progress state for the manual "Adaugă perete" toolbar mode. When the

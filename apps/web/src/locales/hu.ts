@@ -341,4 +341,18 @@ export const hu = {
     saving: 'Mentés...',
     accessDenied: 'Nincs jogosultságod ehhez az oldalhoz.',
   },
+  collaboration: {
+    title: 'Együttműködés',
+    members: 'Csapattagok',
+    inviteEmail: 'Email cím',
+    inviteRole: 'Szerepkör',
+    inviteButton: 'Meghívás',
+    roleOwner: 'Tulajdonos',
+    roleEditor: 'Szerkesztő',
+    roleViewer: 'Megtekintő',
+    removeButton: 'Eltávolítás',
+    pendingInvite: 'Függő meghívó',
+    noMembers: 'Nincs tag',
+    toolCollab: 'Csapat',
+  },
 } satisfies Dictionary

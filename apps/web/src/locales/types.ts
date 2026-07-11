@@ -331,4 +331,18 @@ export interface Dictionary {
     saving: string
     accessDenied: string
   }
+  collaboration: {
+    title: string
+    members: string
+    inviteEmail: string
+    inviteRole: string
+    inviteButton: string
+    roleOwner: string
+    roleEditor: string
+    roleViewer: string
+    removeButton: string
+    pendingInvite: string
+    noMembers: string
+    toolCollab: string
+  }
 }

@@ -93,6 +93,8 @@ export const ro = {
     toolCostBoq: 'Deviz',
     toolExportPdf: 'Export PDF',
     exportPdfLoading: 'Se generează...',
+    toolExportIfc: 'Export IFC',
+    exportIfcLoading: 'Se generează...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Click pentru capătul de început al peretelui',

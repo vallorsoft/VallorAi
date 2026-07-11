@@ -93,6 +93,8 @@ export const hu = {
     toolCostBoq: 'Költségvetés',
     toolExportPdf: 'PDF export',
     exportPdfLoading: 'Generálás...',
+    toolExportIfc: 'IFC export',
+    exportIfcLoading: 'Generálás...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Kattints a fal kezdőpontjához',

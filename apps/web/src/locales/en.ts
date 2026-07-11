@@ -93,6 +93,8 @@ export const en = {
     toolCostBoq: 'Cost BOQ',
     toolExportPdf: 'Export PDF',
     exportPdfLoading: 'Generating...',
+    toolExportIfc: 'Export IFC',
+    exportIfcLoading: 'Generating...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Click for the wall start point',

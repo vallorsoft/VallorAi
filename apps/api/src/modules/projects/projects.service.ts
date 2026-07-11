@@ -298,4 +298,133 @@ export class ProjectsService {
     await this.assertOwnership(projectId, requesterId)
     await prisma.projectMember.deleteMany({ where: { projectId, userId: targetUserId } })
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Project task helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getProjectTasks(projectId: string, userId: string) {
+    await this.assertProjectAccess(projectId, userId, 'VIEWER')
+    return prisma.projectTask.findMany({
+      where: { projectId },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  async createTask(
+    projectId: string,
+    userId: string,
+    dto: {
+      title: string
+      description?: string
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+      assignedToId?: string
+      dueDate?: string
+    },
+  ) {
+    await this.assertProjectAccess(projectId, userId, 'EDITOR')
+
+    // Validate assignedToId — must be a project member (with accepted invite) or the owner.
+    if (dto.assignedToId) {
+      const project = await prisma.project.findUnique({ where: { id: projectId } })
+      const isOwner = project?.userId === dto.assignedToId
+      if (!isOwner) {
+        const membership = await prisma.projectMember.findUnique({
+          where: { projectId_userId: { projectId, userId: dto.assignedToId } },
+        })
+        if (!membership || !membership.acceptedAt) {
+          throw new BadRequestException('A hozzárendelt felhasználó nem tagja a projektnek')
+        }
+      }
+    }
+
+    return prisma.projectTask.create({
+      data: {
+        projectId,
+        title: dto.title,
+        description: dto.description,
+        priority: (dto.priority as never) ?? 'MEDIUM',
+        assignedToId: dto.assignedToId ?? null,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+      },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+      },
+    })
+  }
+
+  async updateTask(
+    projectId: string,
+    taskId: string,
+    userId: string,
+    dto: {
+      title?: string
+      description?: string
+      status?: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+      assignedToId?: string | null
+      dueDate?: string | null
+    },
+  ) {
+    await this.assertProjectAccess(projectId, userId, 'EDITOR')
+
+    const task = await prisma.projectTask.findUnique({ where: { id: taskId } })
+    if (!task || task.projectId !== projectId) {
+      throw new NotFoundException('Task not found')
+    }
+
+    // Validate assignedToId if provided and non-null.
+    if (dto.assignedToId !== undefined && dto.assignedToId !== null) {
+      const project = await prisma.project.findUnique({ where: { id: projectId } })
+      const isOwner = project?.userId === dto.assignedToId
+      if (!isOwner) {
+        const membership = await prisma.projectMember.findUnique({
+          where: { projectId_userId: { projectId, userId: dto.assignedToId } },
+        })
+        if (!membership || !membership.acceptedAt) {
+          throw new BadRequestException('A hozzárendelt felhasználó nem tagja a projektnek')
+        }
+      }
+    }
+
+    // Manage completedAt automatically on status transitions.
+    let completedAt: Date | null | undefined = undefined
+    if (dto.status === 'DONE') {
+      completedAt = task.completedAt ?? new Date()
+    } else if (dto.status !== undefined && dto.status !== 'DONE') {
+      completedAt = null
+    }
+
+    return prisma.projectTask.update({
+      where: { id: taskId },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.status !== undefined && { status: dto.status as never }),
+        ...(dto.priority !== undefined && { priority: dto.priority as never }),
+        ...(dto.assignedToId !== undefined && { assignedToId: dto.assignedToId }),
+        ...(dto.dueDate !== undefined && {
+          dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+        }),
+        ...(completedAt !== undefined && { completedAt }),
+      },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+      },
+    })
+  }
+
+  async deleteTask(projectId: string, taskId: string, userId: string) {
+    await this.assertProjectAccess(projectId, userId, 'EDITOR')
+
+    const task = await prisma.projectTask.findUnique({ where: { id: taskId } })
+    if (!task || task.projectId !== projectId) {
+      throw new NotFoundException('Task not found')
+    }
+
+    await prisma.projectTask.delete({ where: { id: taskId } })
+  }
 }

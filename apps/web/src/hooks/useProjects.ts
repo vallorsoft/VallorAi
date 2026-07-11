@@ -494,6 +494,92 @@ export function useRemoveMember(projectId: string) {
   })
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Task hooks
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ProjectTaskRow {
+  id: string
+  projectId: string
+  title: string
+  description: string | null
+  status: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
+  priority: 'LOW' | 'MEDIUM' | 'HIGH'
+  assignedToId: string | null
+  assignedTo: { id: string; name: string; email: string } | null
+  dueDate: string | null
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export function useProjectTasks(projectId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['project-tasks', projectId],
+    queryFn: async () => {
+      const res = await api.get(`/projects/${projectId}/tasks`)
+      return res.data as ProjectTaskRow[]
+    },
+    enabled: !!projectId,
+  })
+}
+
+export function useCreateTask(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: {
+      title: string
+      description?: string
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+      assignedToId?: string
+      dueDate?: string
+    }) => {
+      const res = await api.post(`/projects/${projectId}/tasks`, data)
+      return res.data as ProjectTaskRow
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+    },
+  })
+}
+
+export function useUpdateTask(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      ...patch
+    }: {
+      taskId: string
+      title?: string
+      description?: string
+      status?: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+      assignedToId?: string | null
+      dueDate?: string | null
+    }) => {
+      const res = await api.patch(`/projects/${projectId}/tasks/${taskId}`, patch)
+      return res.data as ProjectTaskRow
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+    },
+  })
+}
+
+export function useDeleteTask(projectId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const res = await api.delete(`/projects/${projectId}/tasks/${taskId}`)
+      return res.data
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+    },
+  })
+}
+
 interface Project {
   id: string
   name: string

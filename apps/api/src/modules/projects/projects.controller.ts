@@ -116,4 +116,56 @@ export class ProjectsController {
   ) {
     return this.projectsService.removeMember(id, req.user.id, targetUserId)
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Task endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+
+  @Get(':id/tasks')
+  getProjectTasks(@Param('id') id: string, @Request() req: { user: { id: string } }) {
+    return this.projectsService.getProjectTasks(id, req.user.id)
+  }
+
+  @Post(':id/tasks')
+  createTask(
+    @Param('id') id: string,
+    @Request() req: { user: { id: string } },
+    @Body()
+    dto: {
+      title: string
+      description?: string
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+      assignedToId?: string
+      dueDate?: string
+    },
+  ) {
+    return this.projectsService.createTask(id, req.user.id, dto)
+  }
+
+  @Patch(':id/tasks/:taskId')
+  updateTask(
+    @Param('id') id: string,
+    @Param('taskId') taskId: string,
+    @Request() req: { user: { id: string } },
+    @Body()
+    dto: {
+      title?: string
+      description?: string
+      status?: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+      assignedToId?: string | null
+      dueDate?: string | null
+    },
+  ) {
+    return this.projectsService.updateTask(id, taskId, req.user.id, dto)
+  }
+
+  @Delete(':id/tasks/:taskId')
+  deleteTask(
+    @Param('id') id: string,
+    @Param('taskId') taskId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectsService.deleteTask(id, taskId, req.user.id)
+  }
 }

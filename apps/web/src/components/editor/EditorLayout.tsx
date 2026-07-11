@@ -13,6 +13,7 @@ import { LintelPanel } from './LintelPanel'
 import { CostBoqPanel } from './CostBoqPanel'
 import { StaircasePanel } from './StaircasePanel'
 import { CollaborationPanel } from './CollaborationPanel'
+import { TaskPanel } from './TaskPanel'
 import { Viewer3D } from '@/components/viewer3d/Viewer3D'
 import { AiChat } from '@/components/ai/AiChat'
 import { useHouse } from '@/hooks/useProjects'
@@ -132,6 +133,7 @@ function panelTitle(
   if (structuralPanel === 'cost-boq') return t.editor.costBoqPanel.title
   if (structuralPanel === 'staircase') return t.editor.structuralInspector.staircase.title
   if (structuralPanel === 'collaboration') return t.collaboration.title
+  if (structuralPanel === 'tasks') return t.tasks.title
   if (selectedOpeningId) return t.editor.structuralInspector.lintel.title
   if (selectedWallId) return t.editor.layerPanel.title
   return t.editor.propertiesTitle
@@ -151,6 +153,7 @@ function renderRightPanel({
   if (structuralPanel === 'cost-boq') return <CostBoqPanel />
   if (structuralPanel === 'staircase') return <StaircasePanel />
   if (structuralPanel === 'collaboration') return <CollaborationPanel projectId={projectId} />
+  if (structuralPanel === 'tasks') return <TaskPanel projectId={projectId} />
   if (selectedOpeningId) return <LintelPanel />
   if (selectedWallId) return <WallLayerPanel />
   return <RoomPanel projectId={projectId} />

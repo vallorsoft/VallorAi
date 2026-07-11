@@ -357,4 +357,28 @@ export interface Dictionary {
     accessibilityEntry: string
     accessibilityBathroom: string
   }
+  tasks: {
+    title: string
+    empty: string
+    addButton: string
+    titleLabel: string
+    descriptionLabel: string
+    priorityLabel: string
+    assigneeLabel: string
+    dueDateLabel: string
+    statusTodo: string
+    statusInProgress: string
+    statusDone: string
+    statusCancelled: string
+    priorityLow: string
+    priorityMedium: string
+    priorityHigh: string
+    markDone: string
+    markInProgress: string
+    deleteButton: string
+    overdue: string
+    toolTasks: string
+    loading: string
+    noAssignee: string
+  }
 }

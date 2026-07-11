@@ -95,6 +95,8 @@ export const ro = {
     exportPdfLoading: 'Se generează...',
     toolExportIfc: 'Export IFC',
     exportIfcLoading: 'Se generează...',
+    toolExportPermitDoc: 'DTAC PDF',
+    exportPermitDocLoading: 'Se generează...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Click pentru capătul de început al peretelui',

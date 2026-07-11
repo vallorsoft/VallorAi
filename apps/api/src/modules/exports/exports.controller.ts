@@ -51,6 +51,19 @@ export class ExportsController {
       .send(content)
   }
 
+  @Get('projects/:id/permit-doc')
+  async getPermitDoc(
+    @Param('id') projectId: string,
+    @Req() req: { user: { id: string } },
+    @Res() reply: FastifyReply,
+  ) {
+    const buffer = await this.exportsService.generatePermitDocForProject(projectId, req.user.id)
+    reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', 'attachment; filename="dtac-rezumat.pdf"')
+      .send(buffer)
+  }
+
   @Get('projects/:id/documents')
   listDocuments(@Param('id') projectId: string) {
     return this.exportsService.listDocuments(projectId)

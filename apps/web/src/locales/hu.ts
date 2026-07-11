@@ -95,6 +95,8 @@ export const hu = {
     exportPdfLoading: 'Generálás...',
     toolExportIfc: 'IFC export',
     exportIfcLoading: 'Generálás...',
+    toolExportPermitDoc: 'DTAC PDF',
+    exportPermitDocLoading: 'Generálás...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Kattints a fal kezdőpontjához',

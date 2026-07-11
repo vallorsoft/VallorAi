@@ -95,6 +95,8 @@ export const en = {
     exportPdfLoading: 'Generating...',
     toolExportIfc: 'Export IFC',
     exportIfcLoading: 'Generating...',
+    toolExportPermitDoc: 'DTAC PDF',
+    exportPermitDocLoading: 'Generating...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Click for the wall start point',

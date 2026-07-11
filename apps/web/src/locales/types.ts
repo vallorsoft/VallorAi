@@ -93,6 +93,8 @@ export interface Dictionary {
     exportPdfLoading: string
     toolExportIfc: string
     exportIfcLoading: string
+    toolExportPermitDoc: string
+    exportPermitDocLoading: string
     toolView2d: string
     toolView3d: string
     addWallHintFirstClick: string

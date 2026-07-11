@@ -383,4 +383,32 @@ export interface Dictionary {
     loading: string
     noAssignee: string
   }
+  mep: {
+    /** Toolbar button label */
+    toolMep: string
+    /** Inspector panel title */
+    title: string
+    loading: string
+    /** Empty state — house has no rooms yet */
+    empty: string
+    /** Regenerate button (after room types changed) */
+    regenerateButton: string
+    regenerating: string
+    /** Per-room header label prefix, e.g. "Cameră: Baie" */
+    roomLabel: string
+    /** Fallback when room type is not classifiable to a known MEP category */
+    unknownRoom: string
+    /** Standard reference column heading */
+    standardColumn: string
+    /** Count column heading */
+    countColumn: string
+    typeLabels: {
+      WATER_SUPPLY: string
+      HOT_WATER_SUPPLY: string
+      DRAIN: string
+      ELECTRICAL_OUTLET: string
+      SWITCH: string
+      LIGHTING_POINT: string
+    }
+  }
 }

@@ -284,6 +284,7 @@ model House {
   tieColumns  TieColumn[]
   centuri     Centura[]
   staircases  Staircase[]
+  mepPoints   MepPoint[]
   roof        Roof?
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -323,7 +324,8 @@ model Room {
   posY    Float  @default(0)
   aiJustification String?
 
-  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  house     House      @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  mepPoints MepPoint[]
 
   @@index([houseId])
 }
@@ -483,6 +485,19 @@ enum TieColumnCategory {
   S3
 }
 
+// MEP (Mechanical, Electrical, Plumbing) point types derived per room per
+// Romanian standards: I 9-2015 (sanitary installations) and NTE 007/08/00 +
+// PE 155/92 (electrical installations). Derived deterministically by
+// packages/bim-engine mep.ts — classifyRoomForMep + deriveMepPointsForRoom.
+enum MepPointType {
+  WATER_SUPPLY
+  HOT_WATER_SUPPLY
+  DRAIN
+  ELECTRICAL_OUTLET
+  SWITCH
+  LIGHTING_POINT
+}
+
 model Material {
   id             String           @id @default(cuid())
   category       MaterialCategory
@@ -632,6 +647,32 @@ model Staircase {
   updatedAt      DateTime @updatedAt
 
   @@index([houseId])
+}
+
+// One MEP point specification per (house, room, type) triplet — auto-provisioned
+// by HousesService.getMepPoints on first call, by iterating each room's type
+// through packages/bim-engine mep.ts deriveMepPointsForRoom. Counts/standards
+// follow I 9-2015 (plumbing) and NTE 007/08/00 + PE 155/92 (electrical).
+// Linked to both House (for bulk listing) and Room (for per-room view).
+// Deleted and re-derived by HousesService.regenerateMepPoints when room types
+// change (POST /houses/:id/mep/regenerate).
+model MepPoint {
+  id       String       @id @default(cuid())
+  houseId  String
+  roomId   String?
+  type     MepPointType
+  count    Int
+  standard String
+  notes    String?
+
+  house House  @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  room  Room?  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([houseId])
+  @@index([roomId])
 }
 
 model AssemblyLayer {

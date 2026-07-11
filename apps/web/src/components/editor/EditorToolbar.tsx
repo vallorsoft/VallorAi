@@ -110,6 +110,7 @@ export function EditorToolbar() {
     { panel: 'centuri' as const, label: t.editor.structuralInspector.toolCenturi },
     { panel: 'roof' as const, label: t.editor.structuralInspector.toolRoof },
     { panel: 'staircase' as const, label: t.editor.structuralInspector.toolStaircase },
+    { panel: 'mep' as const, label: t.mep.toolMep },
     { panel: 'cost-boq' as const, label: t.editor.toolCostBoq },
     { panel: 'collaboration' as const, label: t.collaboration.toolCollab },
     { panel: 'tasks' as const, label: t.tasks.toolTasks },

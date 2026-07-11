@@ -143,4 +143,14 @@ export class HousesController {
   ) {
     return this.housesService.removeStaircase(houseId, staircaseId)
   }
+
+  @Get(':id/mep')
+  getMepPoints(@Param('id') houseId: string) {
+    return this.housesService.getMepPoints(houseId)
+  }
+
+  @Post(':id/mep/regenerate')
+  regenerateMepPoints(@Param('id') houseId: string) {
+    return this.housesService.regenerateMepPoints(houseId)
+  }
 }

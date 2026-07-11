@@ -590,6 +590,44 @@ interface Project {
   updatedAt: string
 }
 
+// ─── MEP (Mechanical, Electrical, Plumbing) hooks ─────────────────────────
+
+export interface MepPointRow {
+  id: string
+  houseId: string
+  roomId: string | null
+  type: 'WATER_SUPPLY' | 'HOT_WATER_SUPPLY' | 'DRAIN' | 'ELECTRICAL_OUTLET' | 'SWITCH' | 'LIGHTING_POINT'
+  count: number
+  standard: string
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export function useMepPoints(houseId: string | undefined) {
+  return useQuery({
+    queryKey: ['mep-points', houseId],
+    queryFn: async () => {
+      const res = await api.get(`/houses/${houseId}/mep`)
+      return res.data as MepPointRow[]
+    },
+    enabled: !!houseId,
+  })
+}
+
+export function useRegenerateMep(houseId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/houses/${houseId}/mep/regenerate`)
+      return res.data as MepPointRow[]
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['mep-points', houseId] })
+    },
+  })
+}
+
 interface ConversationMessage {
   id: string
   role: 'user' | 'assistant'

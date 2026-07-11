@@ -159,6 +159,7 @@ export interface Dictionary {
       toolCenturi: string
       toolRoof: string
       toolLintel: string
+      toolStaircase: string
       loading: string
       verified: string
       unverified: string
@@ -222,6 +223,27 @@ export interface Dictionary {
           FLAT: string
           MONOSLOPE: string
         }
+      }
+      staircase: {
+        title: string
+        empty: string
+        addButton: string
+        floor: string
+        width: string
+        length: string
+        riserCount: string
+        riserHeight: string
+        treadDepth: string
+        horizontalRun: string
+        blondelCheck: string
+        blondelTarget: string
+        handedness: string
+        handednessRight: string
+        handednessLeft: string
+        codeCompliant: string
+        codeViolation: string
+        loading: string
+        deleteButton: string
       }
     }
     viewer3d: {

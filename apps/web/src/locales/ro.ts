@@ -131,6 +131,12 @@ export const ro = {
     costBoqPanel: {
       title: 'Deviz cantitativ',
       grandTotal: 'Total general',
+      subtotalMaterials: 'Subtotal materiale',
+      subtotalLabor: 'Subtotal manoperă',
+      laborSection: 'Manoperă',
+      taxSection: 'Taxe',
+      vatRate: 'TVA 19%',
+      vatNote: 'Cotă redusă 5% posibilă (Cod Fiscal art. 291) dacă prețul ≤ 600.000 RON și suprafața utilă ≤ 120 m².',
       loading: 'Se calculează devizul...',
       empty: 'Nu există date pentru deviz încă — adaugă camere sau pereți.',
       unverifiedChip: 'Neconfirmat',

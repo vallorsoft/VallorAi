@@ -131,6 +131,12 @@ export const en = {
     costBoqPanel: {
       title: 'Bill of quantities',
       grandTotal: 'Grand total',
+      subtotalMaterials: 'Materials subtotal',
+      subtotalLabor: 'Labor subtotal',
+      laborSection: 'Labor',
+      taxSection: 'Taxes',
+      vatRate: 'VAT 19%',
+      vatNote: 'Reduced 5% rate may apply (Romanian Tax Code art. 291) if price ≤ 600,000 RON and usable area ≤ 120 m².',
       loading: 'Computing estimate...',
       empty: 'No data for the estimate yet — add rooms or walls.',
       unverifiedChip: 'Unverified',

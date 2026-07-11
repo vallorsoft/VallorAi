@@ -128,6 +128,12 @@ export interface Dictionary {
     costBoqPanel: {
       title: string
       grandTotal: string
+      subtotalMaterials: string
+      subtotalLabor: string
+      laborSection: string
+      taxSection: string
+      vatRate: string
+      vatNote: string
       loading: string
       empty: string
       unverifiedChip: string

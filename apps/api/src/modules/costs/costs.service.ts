@@ -41,6 +41,37 @@ export interface CostItem {
 const DEFAULT_BED_JOINT_MM = 12
 const DEFAULT_HEAD_JOINT_MM = 10
 
+// ---------------------------------------------------------------------------
+// Labor cost rates (RON/m²) — Romanian market estimates, Bursa Construcțiilor
+// 2024. No official RO labor-cost index exists, so ALL labor lines are always
+// priceVerified: false. Rates are direct manpower only (no material, no
+// equipment); actual rates vary by region, contractor type and site access.
+// ---------------------------------------------------------------------------
+const LABOR_RATES_RON_PER_M2 = {
+  foundation: 350, // Fundație — săpătură, cofraj, betonare
+  masonry:    280, // Zidărie (blocuri ceramice/beton) — zidar + ajutor
+  plaster:     80, // Tencuială interioară/exterioară (per m² netă față)
+  insulation:  60, // Termoizolație (per m² față exterioară netă)
+  painting:    35, // Vopsitorie (per m² netă față)
+  roofing:    200, // Învelitoare — montaj șipcuire + țiglă
+  structural: 400, // Structură confinată — stâlpișori, centuri, buiandruguri
+  carpentry:  150, // Tâmplărie — montaj uși + ferestre (per m² deschidere)
+} as const
+
+// Legea 227/2015 (Codul Fiscal) — standard TVA rate for construction.
+// A reduced 5% rate applies when the total price ≤ 600,000 RON and the
+// usable floor area ≤ 120 m² (Codul Fiscal art. 291). Not auto-applied here
+// — a future Project.vatRateOverride field would handle that case.
+const VAT_RATE = 0.19
+
+// Default strip-footing width for foundation labor area estimate — matches
+// deriveStripFootingWidthMm(380mm wall) = 380 + 2×150 = 680mm, per
+// NP 112-2014 constructive minimums (same formula the foundation BOQ uses).
+const DEFAULT_FOOTING_WIDTH_M = 0.68
+
+// Labor-line annotation surfaced to the UI as an "unverified" note.
+const LABOR_NOTE = 'Estimat Bursa Construcțiilor 2024 — neconfirmat'
+
 // Storey height for tie-column/wall volume defaults when a Wall.height is
 // absent. Matches Wall.height's Prisma default (2.7m) and the 3D viewer's
 // LEVEL_HEIGHT_M — not a storey-height spec (see CLAUDE.md's "AI rooms →
@@ -80,7 +111,16 @@ export class CostsService {
     bathroom: 200,       // bathroom fixtures avg
   }
 
-  async estimateByArea(houseId: string): Promise<{ breakdown: CostItem[]; total: number; currency: string }> {
+  async estimateByArea(houseId: string): Promise<{
+    breakdown: CostItem[]
+    subtotalMaterials: number
+    subtotalLabor: number
+    vatAmount: number
+    grandTotal: number
+    /** Alias for grandTotal — preserved for backward-compatibility with existing callers. */
+    total: number
+    currency: string
+  }> {
     const house = await prisma.house.findUnique({
       where: { id: houseId },
       include: { rooms: true, walls: { include: { openings: true } } },
@@ -128,7 +168,7 @@ export class CostsService {
         unitPrice: rate,
       }))
 
-    const breakdown: CostItem[] = [
+    const materialLines: CostItem[] = [
       ...flatCategories,
       ...wallBoq,
       ...foundationBoq,
@@ -136,15 +176,134 @@ export class CostsService {
       ...lintelBoq,
       ...roofBoq,
     ]
-    const total = breakdown.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+    const subtotalMaterials = Math.round(
+      materialLines.reduce((s, i) => s + i.quantity * i.unitPrice, 0) * 100,
+    ) / 100
+
+    // Labor lines — Bursa Construcțiilor 2024 market estimates derived from
+    // house geometry; all priceVerified: false (no official RO labor index).
+    const laborLines = this.calculateLaborLines(totalArea, house.walls, roofBoq)
+    const subtotalLabor = Math.round(
+      laborLines.reduce((s, i) => s + i.quantity * i.unitPrice, 0) * 100,
+    ) / 100
+
+    // TVA 19% (Legea 227/2015). Applied to the full materials + labor subtotal.
+    // Reduced 5% may apply for residential buildings (Codul Fiscal art. 291) —
+    // not auto-applied here; see the notes field for conditions.
+    const vatBase = subtotalMaterials + subtotalLabor
+    const vatAmount = Math.round(vatBase * VAT_RATE * 100) / 100
+    const grandTotal = Math.round((vatBase + vatAmount) * 100) / 100
+
+    const taxLine: CostItem = {
+      category: 'tax',
+      name: 'TVA 19%',
+      quantity: 1,
+      unit: 'RON',
+      unitPrice: vatAmount,
+      priceVerified: false,
+      notes: 'TVA standard 19% (Legea 227/2015). Cotă redusă 5% posibilă dacă prețul ≤ 600.000 RON și suprafața utilă ≤ 120 m² (Codul Fiscal art. 291).',
+    }
+
+    const breakdown: CostItem[] = [...materialLines, ...laborLines, taxLine]
 
     await prisma.costEstimate.upsert({
       where: { projectId: house.projectId },
-      create: { projectId: house.projectId, total, currency: 'RON', breakdown: breakdown as never },
-      update: { total, breakdown: breakdown as never },
+      create: {
+        projectId: house.projectId,
+        total: grandTotal,
+        currency: 'RON',
+        breakdown: breakdown as never,
+      },
+      update: { total: grandTotal, breakdown: breakdown as never },
     })
 
-    return { breakdown, total, currency: 'RON' }
+    return {
+      breakdown,
+      subtotalMaterials,
+      subtotalLabor,
+      vatAmount,
+      grandTotal,
+      total: grandTotal,
+      currency: 'RON',
+    }
+  }
+
+  /**
+   * Labor cost lines derived from house geometry. All rates are Bursa
+   * Construcțiilor 2024 market estimates — no official Romanian labor-cost
+   * index exists — so every line carries priceVerified: false.
+   *
+   * Quantity conventions:
+   *   foundation  — ground-floor bearing-wall perimeter × footing width (m²)
+   *   masonry     — gross wall face area, all walls (m²)
+   *   plaster     — net wall area (gross − openings), all walls (m²)
+   *   insulation  — exterior net wall area (m²)
+   *   painting    — same as plaster, net wall area (m²)
+   *   structural  — load-bearing wall face area (tie-columns + centuri proxy, m²)
+   *   roofing     — roof covering area from roof BOQ, else floor area (m²)
+   *   carpentry   — total openings area (doors + windows, m²)
+   *
+   * Lines with zero quantity are omitted (e.g. carpentry when there are no
+   * openings yet, roofing when there's no roof).
+   */
+  private calculateLaborLines(
+    totalArea: number,
+    walls: (Wall & { openings: Opening[] })[],
+    roofBoq: CostItem[],
+  ): CostItem[] {
+    if (walls.length === 0) return []
+
+    const wallLen = (w: Wall) => Math.hypot(w.endX - w.startX, w.endY - w.startY)
+
+    const allWallAreaM2 = walls.reduce((s, w) => s + wallLen(w) * w.height, 0)
+    const exteriorWallAreaM2 = walls
+      .filter((w) => w.isExterior)
+      .reduce((s, w) => s + wallLen(w) * w.height, 0)
+    const bearingWallAreaM2 = walls
+      .filter((w) => w.isExterior || w.isLoad)
+      .reduce((s, w) => s + wallLen(w) * w.height, 0)
+
+    const totalOpeningsAreaM2 = walls.reduce(
+      (s, w) => s + w.openings.reduce((os, o) => os + o.width * o.height, 0),
+      0,
+    )
+    const netWallAreaM2 = Math.max(0, allWallAreaM2 - totalOpeningsAreaM2)
+    const exteriorNetWallAreaM2 = Math.max(0, exteriorWallAreaM2 - totalOpeningsAreaM2)
+
+    // Foundation labor: footing footprint area = perimeter × footing width.
+    const groundBearingPerimeterM = walls
+      .filter((w) => w.floor === 0 && (w.isExterior || w.isLoad))
+      .reduce((s, w) => s + wallLen(w), 0)
+    const foundationLaborAreaM2 = groundBearingPerimeterM * DEFAULT_FOOTING_WIDTH_M
+
+    // Roof labor: use the already-derived covering area; fall back to floor area.
+    const roofCovering = roofBoq.find((l) => l.category === 'roof-covering')
+    const roofLaborAreaM2 = roofCovering ? roofCovering.quantity : totalArea
+
+    const make = (name: string, rawQty: number, rate: number): CostItem | null => {
+      const quantity = Math.round(rawQty * 100) / 100
+      if (quantity <= 0) return null
+      return {
+        category: 'labor',
+        name,
+        quantity,
+        unit: 'm²',
+        unitPrice: rate,
+        priceVerified: false,
+        notes: LABOR_NOTE,
+      }
+    }
+
+    return [
+      make('Manoperă fundație',      foundationLaborAreaM2,  LABOR_RATES_RON_PER_M2.foundation),
+      make('Manoperă zidărie',        allWallAreaM2,          LABOR_RATES_RON_PER_M2.masonry),
+      make('Manoperă tencuială',      netWallAreaM2,          LABOR_RATES_RON_PER_M2.plaster),
+      make('Manoperă termoizolație',  exteriorNetWallAreaM2,  LABOR_RATES_RON_PER_M2.insulation),
+      make('Manoperă vopsitorie',     netWallAreaM2,          LABOR_RATES_RON_PER_M2.painting),
+      make('Manoperă structură',      bearingWallAreaM2,      LABOR_RATES_RON_PER_M2.structural),
+      make('Manoperă învelitoare',    roofLaborAreaM2,        LABOR_RATES_RON_PER_M2.roofing),
+      make('Manoperă tâmplărie',      totalOpeningsAreaM2,    LABOR_RATES_RON_PER_M2.carpentry),
+    ].filter((l): l is CostItem => l !== null)
   }
 
   /**

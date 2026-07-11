@@ -131,6 +131,12 @@ export const hu = {
     costBoqPanel: {
       title: 'Költségvetés',
       grandTotal: 'Végösszeg',
+      subtotalMaterials: 'Anyag részösszeg',
+      subtotalLabor: 'Munkaerő részösszeg',
+      laborSection: 'Munkaerő',
+      taxSection: 'Adók',
+      vatRate: 'ÁFA 19%',
+      vatNote: 'Kedvezményes 5% lehetséges (Codul Fiscal art. 291) ha az ár ≤ 600.000 RON és a hasznos alapterület ≤ 120 m².',
       loading: 'Költségvetés számítása...',
       empty: 'Még nincs adat a költségvetéshez — adj hozzá szobákat vagy falakat.',
       unverifiedChip: 'Nem ellenőrzött',

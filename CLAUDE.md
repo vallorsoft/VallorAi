@@ -1082,6 +1082,22 @@ reference going forward. Keep this section updated as Steps 5–9 land.
   - Two new i18n keys: `editor.toolExportIfc` / `editor.exportIfcLoading` in `Dictionary` +
     all three locale files; TS `satisfies Dictionary` enforces completeness.
 
+- **Project task management (2026-07-11, PR #59)**. Full CRUD task module for project teams.
+  - **Prisma**: `ProjectTask` model with `TaskStatus` enum (TODO/IN_PROGRESS/DONE/CANCELLED)
+    and `TaskPriority` enum (LOW/MEDIUM/HIGH). FK to `Project` (CASCADE delete), nullable FK
+    `assignedToId → User`. Manual migration `20260711170000_add_project_tasks`. `Project` and
+    `User` models updated with back-relations (`tasks` / `assignedTasks`).
+  - **API** (`ProjectsService` + `ProjectsController`): four endpoints under `/projects/:id/tasks`:
+    - `GET` — any member with VIEWER or higher access; returns tasks with `assignedTo { id, name, email }`, ordered createdAt DESC.
+    - `POST` — EDITOR or OWNER only; `assignedToId` validated against project owner or accepted `ProjectMember`; status defaults to TODO.
+    - `PATCH /:taskId` — EDITOR or OWNER; `completedAt` auto-set to `now()` when status → DONE, cleared to `null` when transitioning away from DONE; 404 if task doesn't belong to the project.
+    - `DELETE /:taskId` — EDITOR or OWNER; 404 guard.
+  - **E2E** (`apps/api/test/tasks.e2e-spec.ts`): 5 cases — empty list, create with title/priority fields, PATCH status → DONE sets `completedAt`, DELETE empties list, VIEWER cannot create (403).
+  - **i18n**: `Dictionary.tasks` section (23 keys: title, empty, addButton, titleLabel, descriptionLabel, priorityLabel, assigneeLabel, dueDateLabel, statusTodo/InProgress/Done/Cancelled, priorityLow/Medium/High, markDone, markInProgress, deleteButton, overdue, toolTasks, loading, noAssignee) added to `types.ts` and all three locale files (ro/hu/en). TS `satisfies Dictionary` enforces completeness.
+  - **React hooks** (`useProjects.ts`): `ProjectTaskRow` interface + `useProjectTasks`, `useCreateTask`, `useUpdateTask`, `useDeleteTask` mutations — keyed on `['project-tasks', projectId]`.
+  - **`TaskPanel.tsx`**: inline add-task form (title input + priority dropdown), task cards showing priority badge (color-coded HIGH/MEDIUM/LOW), overdue indicator, assignee name or "Unassigned", mark-done/in-progress action links, per-item delete. No hardcoded strings.
+  - **Editor wiring**: `StructuralPanel` union in `project.store.ts` extended with `'tasks'`; toolbar button in `EditorToolbar.tsx` added to `structuralTools`; `panelTitle` + `renderRightPanel` in `EditorLayout.tsx` handle the `'tasks'` case; `TaskPanel` imported.
+
 ## Spec documents
 All 13 PDFs in `docs/materials/` are the source of truth.
 Never add functionality not described there.

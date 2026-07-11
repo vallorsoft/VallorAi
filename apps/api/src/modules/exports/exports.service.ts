@@ -2,9 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
 import { generateFloorPlanPdf, FloorPlanData } from './floor-plan-pdf'
 import { generateIfcContent, IfcExportData } from './ifc-generator'
+import { generatePermitDocPdf, PermitDocData } from './permit-doc-pdf'
+import { ProjectsService } from '../projects/projects.service'
+import { RulesService } from '../rules/rules.service'
 
 @Injectable()
 export class ExportsService {
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly rulesService: RulesService,
+  ) {}
   async generateProjectSummary(projectId: string): Promise<Record<string, unknown>> {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
@@ -182,5 +189,123 @@ export class ExportsService {
   generateDxfPlaceholder(projectId: string): string {
     // DXF export placeholder — real implementation requires a CAD library
     return `; DXF Export placeholder for project ${projectId}\n; Integrate with dxf-writer or ezdxf for full output`
+  }
+
+  async generatePermitDocForProject(projectId: string, userId: string): Promise<Buffer> {
+    // Ownership check — 403 if userId doesn't own the project.
+    await this.projectsService.assertOwnership(projectId, userId)
+
+    const project = await prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      include: {
+        plot: true,
+        user: { select: { name: true } },
+        house: {
+          include: {
+            rooms: true,
+            walls: {
+              include: {
+                layers: {
+                  include: { material: true },
+                  orderBy: { order: 'asc' },
+                },
+                openings: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const date = new Date().toLocaleDateString('ro-RO')
+    const projectName = project.name ?? `Proiect ${projectId.slice(-6)}`
+    const ownerName = project.user?.name ?? '—'
+
+    const plotParts = [project.plot?.county, project.plot?.city].filter(Boolean)
+    const projectAddress = plotParts.length > 0 ? plotParts.join(', ') : '—'
+
+    if (!project.house) {
+      // No house data yet — return a valid PDF with empty rooms/validation
+      const emptyData: PermitDocData = {
+        projectName,
+        ownerName,
+        projectAddress,
+        date,
+        houseData: { totalAreaSqm: 0, floorCount: 1, roomCount: 0, wallCount: 0 },
+        rooms: [],
+        validationResult: { permitReadiness: 0, violations: [], passedRules: [] },
+      }
+      return generatePermitDocPdf(emptyData)
+    }
+
+    const house = project.house
+    const rooms = house.rooms
+    const walls = house.walls
+
+    // ── House summary numbers ──────────────────────────────────────────────────
+    const totalAreaSqm = rooms.reduce((sum, r) => sum + (r.area ?? 0), 0)
+    const floors = [...new Set(rooms.map((r) => r.floor ?? 0))]
+    const floorCount = floors.length > 0 ? Math.max(...floors) + 1 : 1
+
+    // ── Validation ────────────────────────────────────────────────────────────
+    const houseForValidation = {
+      rooms: rooms.map((r) => ({
+        type: r.type ?? 'ROOM',
+        area: r.area ?? 0,
+        floor: r.floor ?? 0,
+      })),
+      walls: walls.map((w) => ({
+        exterior: w.exterior ?? false,
+        floor: w.floor ?? 0,
+        layers: w.layers.map((l) => ({
+          thicknessMm: l.thicknessMm,
+          material: l.material
+            ? { specSheet: l.material.specSheet as Record<string, unknown> | null }
+            : undefined,
+        })),
+        openings: w.openings.map((o) => ({
+          widthM: o.widthM,
+          type: o.type ?? undefined,
+        })),
+      })),
+      floorCount,
+    }
+    const validationResult = this.rulesService.validate(houseForValidation, 'RO')
+
+    // ── Room list for PDF ─────────────────────────────────────────────────────
+    const roomList: PermitDocData['rooms'] = rooms.map((r) => ({
+      type: r.type ?? 'ROOM',
+      name: r.name ?? '',
+      areaSqm: r.area ?? 0,
+      floor: r.floor ?? 0,
+    }))
+
+    const data: PermitDocData = {
+      projectName,
+      ownerName,
+      projectAddress,
+      date,
+      houseData: {
+        totalAreaSqm,
+        floorCount,
+        roomCount: rooms.length,
+        wallCount: walls.length,
+      },
+      rooms: roomList,
+      validationResult: {
+        permitReadiness: validationResult.permitReadiness,
+        violations: validationResult.violations.map((v) => ({
+          ruleId: v.ruleCode,
+          message: v.message,
+          severity: v.severity === 'INFO' ? 'WARNING' : v.severity,
+        })),
+        passedRules: validationResult.passedRules.map((ruleCode) => ({
+          ruleId: ruleCode,
+          message: ruleCode,
+        })),
+      },
+    }
+
+    return generatePermitDocPdf(data)
   }
 }

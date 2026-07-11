@@ -30,6 +30,7 @@ export function EditorToolbar() {
 
   const [pdfLoading, setPdfLoading] = useState(false)
   const [ifcLoading, setIfcLoading] = useState(false)
+  const [permitDocLoading, setPermitDocLoading] = useState(false)
 
   const handleDownloadPdf = async () => {
     if (!activeProjectId || pdfLoading) return
@@ -72,6 +73,28 @@ export function EditorToolbar() {
       URL.revokeObjectURL(objUrl)
     } finally {
       setIfcLoading(false)
+    }
+  }
+
+  const handleDownloadPermitDoc = async () => {
+    if (!activeProjectId || permitDocLoading) return
+    setPermitDocLoading(true)
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const response = await fetch(
+        `${BASE_URL}/exports/projects/${activeProjectId}/permit-doc`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      )
+      if (!response.ok) throw new Error('DTAC PDF generation failed')
+      const blob = await response.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = 'dtac-rezumat.pdf'
+      a.click()
+      URL.revokeObjectURL(objUrl)
+    } finally {
+      setPermitDocLoading(false)
     }
   }
 
@@ -156,6 +179,14 @@ export function EditorToolbar() {
           className="px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {ifcLoading ? t.editor.exportIfcLoading : t.editor.toolExportIfc}
+        </button>
+        <button
+          onClick={handleDownloadPermitDoc}
+          disabled={permitDocLoading}
+          title={t.editor.toolExportPermitDoc}
+          className="px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {permitDocLoading ? t.editor.exportPermitDocLoading : t.editor.toolExportPermitDoc}
         </button>
       </div>
 

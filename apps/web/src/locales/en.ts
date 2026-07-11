@@ -355,4 +355,14 @@ export const en = {
     noMembers: 'No members yet',
     toolCollab: 'Team',
   },
+  rules: {
+    energySection: 'Energy performance',
+    energyWallU: 'Exterior wall thermal transmittance',
+    fireSection: 'Fire safety',
+    fireCompartment: 'Fire compartment area',
+    fireStaircase: 'Staircase required',
+    accessibilitySection: 'Accessibility',
+    accessibilityEntry: 'Entry door width',
+    accessibilityBathroom: 'Bathroom area (wheelchair access)',
+  },
 } satisfies Dictionary

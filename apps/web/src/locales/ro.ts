@@ -355,4 +355,14 @@ export const ro = {
     noMembers: 'Niciun membru',
     toolCollab: 'Echipă',
   },
+  rules: {
+    energySection: 'Eficiență energetică',
+    energyWallU: 'Transmitanță termică perete exterior',
+    fireSection: 'Securitate la incendiu',
+    fireCompartment: 'Compartiment de incendiu',
+    fireStaircase: 'Casă de scară necesară',
+    accessibilitySection: 'Accesibilitate',
+    accessibilityEntry: 'Lățime ușă de intrare',
+    accessibilityBathroom: 'Suprafață baie (persoană cu handicap)',
+  },
 } satisfies Dictionary

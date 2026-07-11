@@ -11,6 +11,7 @@ import {
   deriveCenturaLevels,
   deriveCenturaReinforcement,
   deriveStaircaseSpec,
+  deriveMepPointsForRoom,
   solveFloorPlan,
   generateOpenings,
   deriveRoofSpec,
@@ -934,5 +935,65 @@ export class HousesService {
     await prisma.staircase.delete({
       where: { id: staircaseId, houseId },
     })
+  }
+
+  // ─── MEP (Mechanical, Electrical, Plumbing) ────────────────────────────────
+
+  /**
+   * Returns all MepPoint rows for the house. Auto-provisions them (idempotent)
+   * on first call by iterating every room through deriveMepPointsForRoom —
+   * same pattern as getFoundation/getTieColumns/getCenturi.
+   *
+   * Standards:
+   *   I 9-2015 — sanitary installation normative (water supply / drain counts)
+   *   NTE 007/08/00 + PE 155/92 — electrical installation standards
+   *   (secondary-corroborated; official PDFs 403 in this environment)
+   */
+  async getMepPoints(houseId: string) {
+    const existing = await prisma.mepPoint.findMany({ where: { houseId } })
+    if (existing.length > 0) return existing
+
+    return this._provisionMepPoints(houseId)
+  }
+
+  /**
+   * Deletes all auto-provisioned MepPoint rows for the house and re-derives
+   * them from the current room set. Call after room type changes.
+   */
+  async regenerateMepPoints(houseId: string) {
+    await prisma.mepPoint.deleteMany({ where: { houseId } })
+    return this._provisionMepPoints(houseId)
+  }
+
+  private async _provisionMepPoints(houseId: string) {
+    const rooms = await prisma.room.findMany({ where: { houseId } })
+    const rows: {
+      houseId: string
+      roomId: string
+      type: 'WATER_SUPPLY' | 'HOT_WATER_SUPPLY' | 'DRAIN' | 'ELECTRICAL_OUTLET' | 'SWITCH' | 'LIGHTING_POINT'
+      count: number
+      standard: string
+      notes?: string | null
+    }[] = []
+
+    for (const room of rooms) {
+      const specs = deriveMepPointsForRoom(room.type)
+      for (const spec of specs) {
+        rows.push({
+          houseId,
+          roomId: room.id,
+          type: spec.type as 'WATER_SUPPLY' | 'HOT_WATER_SUPPLY' | 'DRAIN' | 'ELECTRICAL_OUTLET' | 'SWITCH' | 'LIGHTING_POINT',
+          count: spec.count,
+          standard: spec.standard,
+          notes: spec.notes ?? null,
+        })
+      }
+    }
+
+    if (rows.length > 0) {
+      await prisma.mepPoint.createMany({ data: rows })
+    }
+
+    return prisma.mepPoint.findMany({ where: { houseId } })
   }
 }

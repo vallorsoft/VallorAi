@@ -355,4 +355,14 @@ export const hu = {
     noMembers: 'Nincs tag',
     toolCollab: 'Csapat',
   },
+  rules: {
+    energySection: 'Energiahatékonyság',
+    energyWallU: 'Külső fal hőátbocsátási tényezője',
+    fireSection: 'Tűzvédelem',
+    fireCompartment: 'Tűzszakasz területe',
+    fireStaircase: 'Lépcsőház szükséges',
+    accessibilitySection: 'Akadálymentesség',
+    accessibilityEntry: 'Bejárati ajtó szélessége',
+    accessibilityBathroom: 'Fürdőszoba alapterülete (kerekesszékes)',
+  },
 } satisfies Dictionary

@@ -345,4 +345,14 @@ export interface Dictionary {
     noMembers: string
     toolCollab: string
   }
+  rules: {
+    energySection: string
+    energyWallU: string
+    fireSection: string
+    fireCompartment: string
+    fireStaircase: string
+    accessibilitySection: string
+    accessibilityEntry: string
+    accessibilityBathroom: string
+  }
 }

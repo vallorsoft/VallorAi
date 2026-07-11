@@ -341,6 +341,44 @@ Permit docs: DTAC, PTh, DDE, PAC, POE.
 This is the **livability/permit** rule set (min room areas, required rooms, corridor width) —
 distinct from the structural "law modules" below, which drive what the system actually builds.
 
+### Validation modules added 2026-07-11
+
+Three new rule categories were added to `RulesService` alongside the existing livability checks
+(same file, three private methods, same `ValidationViolation` / `permitReadiness` contract):
+
+- **Energy performance (C107/0-2002, Legea 372/2005, GD 907/2016)** — `ENERGY_WALL_U_VALUE`:
+  computes U = 1/Σ(d/λ) from each exterior wall's `AssemblyLayer` stack and compares to
+  U ≤ 0.50 W/m²K (C107/0-2002 Tab. 1, climate zone II — same zone as București/Bucharest
+  latitude). ERROR when a computed U exceeds the limit; WARNING when λ data is missing from
+  any layer (can't compute). Secondary-corroborated: encipedia.ro C107/0-2002 summary +
+  casasidesign.ro thermal guide. NZEB (GD 907/2016) may require stricter values for post-2020
+  buildings; C107/0-2002 is the permit baseline. Roof and floor-on-ground limits (0.30 /
+  0.40 W/m²K) are defined as constants for future use but not yet checked (no `Roof.layers`
+  nor `Foundation.aboveGroundLayers` model).
+
+- **Fire safety (P 118/99, Legea 307/2006)** — two rule codes:
+  - `FIRE_COMPARTMENT_AREA`: per-floor room-area sum vs 2500 m² residential limit (conservative
+    grade IV–V; grade I–II masonry allows 3600 m² but needs specialist confirmation).
+    WARNING when exceeded. Secondary-corroborated: encipedia.ro + IGSU technical guide.
+  - `FIRE_STAIRCASE_REQUIRED`: WARNING when `floorCount > 1` and no STAIRCASE-type room
+    exists in the house. Single-storey houses are correctly skipped. `floorCount` is taken
+    from `house.floorCount` or derived as `max(room.floor) + 1`.
+
+- **Accessibility (NP 051-2012, HG 622/2004)** — two rule codes:
+  - `ACCESSIBILITY_ENTRY_WIDTH`: checks exterior-wall door openings for widthM ≥ 0.90 m
+    (NP 051-2012 §4.2). WARNING when an exterior door is narrower. When no opening data is
+    provided, deduced from the presence of a HALL/ENTRY room (no violation).
+  - `ACCESSIBILITY_BATHROOM_AREA`: WARNING when any BATHROOM room is < 4 m² (NP 051-2012
+    §5.3, wheelchair turning circle ∅ 1.50 m). Severity is WARNING (not ERROR) because for
+    purely private residences this is a recommendation; mandatory under HG 622/2004 for
+    public/multi-family buildings. Secondary-corroborated: encipedia.ro + casasidesign.ro.
+
+All three check groups are citation-confidence flagged the same way as the structural law
+modules (secondary-corroborated, official PDF hosts 403 in this environment; engineer
+confirmation before construction use). All 9 unit tests (4 existing + 5 new) pass.
+i18n: `Dictionary.rules` section added to `types.ts` and filled in all three locale files
+(ro/hu/en) — TypeScript enforces completeness via `satisfies Dictionary`.
+
 ## Romanian structural building-code "law modules" — status
 
 **Goal** (user requirement, explicit direction 2026-07-08): every structural default the system

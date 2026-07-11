@@ -38,6 +38,19 @@ export class ExportsController {
       .send(buffer)
   }
 
+  @Get('projects/:id/ifc')
+  async getIfc(
+    @Param('id') projectId: string,
+    @Req() req: { user: { id: string } },
+    @Res() reply: FastifyReply,
+  ) {
+    const content = await this.exportsService.generateIfcForProject(projectId, req.user.id)
+    reply
+      .header('Content-Type', 'application/x-step')
+      .header('Content-Disposition', 'attachment; filename="model.ifc"')
+      .send(content)
+  }
+
   @Get('projects/:id/documents')
   listDocuments(@Param('id') projectId: string) {
     return this.exportsService.listDocuments(projectId)

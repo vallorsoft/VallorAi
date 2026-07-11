@@ -29,6 +29,7 @@ export function EditorToolbar() {
   } = useProjectStore()
 
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [ifcLoading, setIfcLoading] = useState(false)
 
   const handleDownloadPdf = async () => {
     if (!activeProjectId || pdfLoading) return
@@ -49,6 +50,28 @@ export function EditorToolbar() {
       URL.revokeObjectURL(objUrl)
     } finally {
       setPdfLoading(false)
+    }
+  }
+
+  const handleDownloadIfc = async () => {
+    if (!activeProjectId || ifcLoading) return
+    setIfcLoading(true)
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const response = await fetch(
+        `${BASE_URL}/exports/projects/${activeProjectId}/ifc`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      )
+      if (!response.ok) throw new Error('IFC generation failed')
+      const blob = await response.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = 'model.ifc'
+      a.click()
+      URL.revokeObjectURL(objUrl)
+    } finally {
+      setIfcLoading(false)
     }
   }
 
@@ -124,6 +147,14 @@ export function EditorToolbar() {
           className="px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {pdfLoading ? t.editor.exportPdfLoading : t.editor.toolExportPdf}
+        </button>
+        <button
+          onClick={handleDownloadIfc}
+          disabled={ifcLoading}
+          title={t.editor.toolExportIfc}
+          className="px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {ifcLoading ? t.editor.exportIfcLoading : t.editor.toolExportIfc}
         </button>
       </div>
 

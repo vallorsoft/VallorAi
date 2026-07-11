@@ -91,6 +91,8 @@ export const en = {
     toolAddRoom: 'Add room',
     toolAddWall: 'Add wall',
     toolCostBoq: 'Cost BOQ',
+    toolExportPdf: 'Export PDF',
+    exportPdfLoading: 'Generating...',
     toolView2d: '2D',
     toolView3d: '3D',
     addWallHintFirstClick: 'Click for the wall start point',

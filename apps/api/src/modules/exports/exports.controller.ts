@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards, Res } from '@nestjs/common'
+import { Controller, Get, Post, Delete, Param, Body, UseGuards, Res, Req } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport'
 import { FastifyReply } from 'fastify'
@@ -23,6 +23,19 @@ export class ExportsController {
       .header('Content-Type', 'application/dxf')
       .header('Content-Disposition', `attachment; filename="project-${projectId}.dxf"`)
       .send(content)
+  }
+
+  @Get('projects/:id/floor-plan-pdf')
+  async getFloorPlanPdf(
+    @Param('id') projectId: string,
+    @Req() req: { user: { id: string } },
+    @Res() reply: FastifyReply,
+  ) {
+    const buffer = await this.exportsService.generateFloorPlanPdfForProject(projectId, req.user.id)
+    reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', 'attachment; filename="alaprajz.pdf"')
+      .send(buffer)
   }
 
   @Get('projects/:id/documents')

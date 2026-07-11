@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
+import { generateFloorPlanPdf, FloorPlanData } from './floor-plan-pdf'
 
 @Injectable()
 export class ExportsService {
@@ -44,6 +45,57 @@ export class ExportsService {
       costEstimate: project.costEstimate,
       documents: project.documents,
     }
+  }
+
+  async generateFloorPlanPdfForProject(projectId: string, userId: string): Promise<Buffer> {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId },
+      include: {
+        house: {
+          include: { rooms: true, walls: true },
+        },
+      },
+    })
+
+    if (!project) throw new NotFoundException('Project not found')
+
+    if (!project.house) {
+      // Return an "empty" PDF — no house data yet
+      const emptyData: FloorPlanData = {
+        projectName: project.name ?? `Projekt ${projectId.slice(-6)}`,
+        date: new Date().toLocaleDateString('ro-RO'),
+        floors: 1,
+        rooms: [],
+        walls: [],
+      }
+      return generateFloorPlanPdf(emptyData)
+    }
+
+    const data: FloorPlanData = {
+      projectName: project.name ?? `Projekt ${projectId.slice(-6)}`,
+      date: new Date().toLocaleDateString('ro-RO'),
+      floors: project.house.floors ?? 1,
+      rooms: project.house.rooms.map((r) => ({
+        id: r.id,
+        type: r.type,
+        posX: r.posX ?? 0,
+        posY: r.posY ?? 0,
+        width: r.width ?? Math.sqrt(Math.max(r.area ?? 20, 1)),
+        area: r.area ?? 20,
+        floor: r.floor ?? 0,
+      })),
+      walls: project.house.walls.map((w) => ({
+        startX: w.startX,
+        startY: w.startY,
+        endX: w.endX,
+        endY: w.endY,
+        thickness: w.thickness ?? 0.3,
+        exterior: w.exterior ?? false,
+        floor: w.floor ?? 0,
+      })),
+    }
+
+    return generateFloorPlanPdf(data)
   }
 
   async listDocuments(projectId: string) {

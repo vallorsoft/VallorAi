@@ -91,6 +91,8 @@ export interface Dictionary {
     toolCostBoq: string
     toolExportPdf: string
     exportPdfLoading: string
+    toolExportIfc: string
+    exportIfcLoading: string
     toolView2d: string
     toolView3d: string
     addWallHintFirstClick: string
@@ -344,5 +346,15 @@ export interface Dictionary {
     pendingInvite: string
     noMembers: string
     toolCollab: string
+  }
+  rules: {
+    energySection: string
+    energyWallU: string
+    fireSection: string
+    fireCompartment: string
+    fireStaircase: string
+    accessibilitySection: string
+    accessibilityEntry: string
+    accessibilityBathroom: string
   }
 }

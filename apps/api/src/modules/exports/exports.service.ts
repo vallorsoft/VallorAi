@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
 import { generateFloorPlanPdf, FloorPlanData } from './floor-plan-pdf'
+import { generateIfcContent, IfcExportData } from './ifc-generator'
 
 @Injectable()
 export class ExportsService {
@@ -122,6 +123,60 @@ export class ExportsService {
 
   async deleteDocument(documentId: string) {
     return prisma.document.delete({ where: { id: documentId } })
+  }
+
+  async generateIfcForProject(projectId: string, userId: string): Promise<string> {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId },
+      include: {
+        house: {
+          include: { rooms: true, walls: true },
+        },
+      },
+    })
+
+    if (!project) throw new NotFoundException('Project not found')
+
+    if (!project.house) {
+      // No house yet — return a valid but empty IFC (hierarchy only)
+      const emptyData: IfcExportData = {
+        projectName: project.name ?? `Projekt ${projectId.slice(-6)}`,
+        date: new Date().toISOString(),
+        floors: 1,
+        rooms: [],
+        walls: [],
+      }
+      return generateIfcContent(emptyData)
+    }
+
+    const data: IfcExportData = {
+      projectName: project.name ?? `Projekt ${projectId.slice(-6)}`,
+      date: new Date().toISOString(),
+      floors: project.house.floors ?? 1,
+      rooms: project.house.rooms.map((r) => ({
+        id: r.id,
+        type: r.type ?? 'ROOM',
+        posX: r.posX ?? 0,
+        posY: r.posY ?? 0,
+        width: r.width ?? Math.sqrt(Math.max(r.area ?? 20, 1)),
+        area: r.area ?? 20,
+        floor: r.floor ?? 0,
+        height: 2.7,
+      })),
+      walls: project.house.walls.map((w) => ({
+        id: w.id,
+        startX: w.startX,
+        startY: w.startY,
+        endX: w.endX,
+        endY: w.endY,
+        thickness: w.thickness ?? 0.3,
+        height: w.height ?? 2.7,
+        exterior: w.exterior ?? false,
+        floor: w.floor ?? 0,
+      })),
+    }
+
+    return generateIfcContent(data)
   }
 
   generateDxfPlaceholder(projectId: string): string {

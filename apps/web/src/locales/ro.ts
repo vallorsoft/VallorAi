@@ -341,4 +341,18 @@ export const ro = {
     saving: 'Se salvează...',
     accessDenied: 'Nu ai acces la această pagină.',
   },
+  collaboration: {
+    title: 'Colaborare',
+    members: 'Membrii echipei',
+    inviteEmail: 'Adresă email',
+    inviteRole: 'Rol',
+    inviteButton: 'Invită',
+    roleOwner: 'Proprietar',
+    roleEditor: 'Editor',
+    roleViewer: 'Vizualizator',
+    removeButton: 'Elimină',
+    pendingInvite: 'Invitație în așteptare',
+    noMembers: 'Niciun membru',
+    toolCollab: 'Echipă',
+  },
 } satisfies Dictionary

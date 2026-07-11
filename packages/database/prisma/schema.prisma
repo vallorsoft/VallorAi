@@ -48,9 +48,10 @@ model User {
   verificationToken          String?   @unique
   verificationTokenExpiresAt DateTime?
 
-  projects  Project[]
-  sessions  Session[]
+  projects           Project[]
+  sessions           Session[]
   passwordResetTokens PasswordResetToken[]
+  projectMemberships ProjectMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -89,6 +90,12 @@ model PasswordResetToken {
 // PROJECTS
 // =====================
 
+enum ProjectMemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
 enum ProjectType {
   FAMILY_HOUSE
   VACATION_HOUSE
@@ -124,12 +131,31 @@ model Project {
   documents   Document[]
   costEstimate CostEstimate?
   versions    ProjectVersion[]
+  members     ProjectMember[]
   currentVersionId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+model ProjectMember {
+  id         String            @id @default(cuid())
+  projectId  String
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       ProjectMemberRole @default(VIEWER)
+  invitedBy  String?
+  invitedAt  DateTime          @default(now())
+  acceptedAt DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
 }
 
 model Plot {

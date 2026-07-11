@@ -65,6 +65,7 @@ export function EditorToolbar() {
     { panel: 'roof' as const, label: t.editor.structuralInspector.toolRoof },
     { panel: 'staircase' as const, label: t.editor.structuralInspector.toolStaircase },
     { panel: 'cost-boq' as const, label: t.editor.toolCostBoq },
+    { panel: 'collaboration' as const, label: t.collaboration.toolCollab },
   ]
 
   const views = [

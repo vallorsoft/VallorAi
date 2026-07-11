@@ -304,6 +304,15 @@ export interface CostBoqLine {
 
 export interface CostEstimateResponse {
   breakdown: CostBoqLine[]
+  /** Materials-only subtotal (excludes labor and VAT). */
+  subtotalMaterials: number
+  /** Labor-only subtotal. */
+  subtotalLabor: number
+  /** VAT amount (19% of materials + labor, Legea 227/2015). */
+  vatAmount: number
+  /** Grand total: materials + labor + VAT. */
+  grandTotal: number
+  /** Alias for grandTotal — preserved for backward-compatibility. */
   total: number
   currency: string
 }

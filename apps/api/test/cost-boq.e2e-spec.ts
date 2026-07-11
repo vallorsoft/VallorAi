@@ -391,8 +391,81 @@ describe('Cost engine BOQ — foundation / tie-columns / centuri / lintels / roo
     }
 
     // Total sanity: sum of every line's quantity × unitPrice = the returned total.
-    const sum = breakdown.reduce((s, l) => s + l.quantity * l.unitPrice, 0)
+    // `total` is now an alias for `grandTotal` (materials + labor + VAT).
+    const sum = breakdown.reduce((s: number, l: { quantity: number; unitPrice: number }) => s + l.quantity * l.unitPrice, 0)
     expect(res.body.data.total).toBeCloseTo(sum, 2)
     expect(res.body.data.total).toBeGreaterThan(0)
+  })
+
+  it('includes labor and TVA lines and exposes subtotal/VAT/grandTotal fields', async () => {
+    const res = await request(server)
+      .post(`/api/v1/costs/houses/${houseId}/estimate`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201)
+
+    const data = res.body.data as {
+      breakdown: Array<{ category: string; name: string; quantity: number; unitPrice: number; priceVerified?: boolean; notes?: string }>
+      subtotalMaterials: number
+      subtotalLabor: number
+      vatAmount: number
+      grandTotal: number
+      total: number
+      currency: string
+    }
+
+    // New top-level fields must be present and positive.
+    expect(typeof data.subtotalMaterials).toBe('number')
+    expect(data.subtotalMaterials).toBeGreaterThan(0)
+    expect(typeof data.subtotalLabor).toBe('number')
+    expect(data.subtotalLabor).toBeGreaterThan(0)
+    expect(typeof data.vatAmount).toBe('number')
+    expect(data.vatAmount).toBeGreaterThan(0)
+    expect(typeof data.grandTotal).toBe('number')
+    expect(data.grandTotal).toBeGreaterThan(0)
+
+    // grandTotal === subtotalMaterials + subtotalLabor + vatAmount (rounded to 2 dp).
+    expect(data.grandTotal).toBeCloseTo(
+      data.subtotalMaterials + data.subtotalLabor + data.vatAmount,
+      2,
+    )
+
+    // vatAmount === (subtotalMaterials + subtotalLabor) × 0.19.
+    expect(data.vatAmount).toBeCloseTo(
+      (data.subtotalMaterials + data.subtotalLabor) * 0.19,
+      2,
+    )
+
+    // total is an alias for grandTotal.
+    expect(data.total).toBeCloseTo(data.grandTotal, 2)
+
+    // breakdown must contain at least one labor line.
+    const laborLines = data.breakdown.filter((l) => l.category === 'labor')
+    expect(laborLines.length).toBeGreaterThan(0)
+
+    // Every labor line must be priceVerified: false (no official labor-cost index).
+    for (const l of laborLines) {
+      expect(l.priceVerified).toBe(false)
+    }
+
+    // breakdown must contain exactly one TVA tax line.
+    const taxLines = data.breakdown.filter((l) => l.category === 'tax')
+    expect(taxLines).toHaveLength(1)
+    expect(taxLines[0]!.name).toBe('TVA 19%')
+    expect(taxLines[0]!.priceVerified).toBe(false)
+    // quantity × unitPrice for the tax line equals vatAmount.
+    expect(taxLines[0]!.quantity * taxLines[0]!.unitPrice).toBeCloseTo(data.vatAmount, 2)
+
+    // The house has 4 exterior walls (perimeter 20m) and 2 openings —
+    // masonry labor should be present (allWallAreaM2 = 4 × 5m × 2.7m = 54 m²).
+    const masonryLabor = laborLines.find((l) => l.name === 'Manoperă zidărie')
+    expect(masonryLabor).toBeDefined()
+    expect(masonryLabor!.quantity).toBeCloseTo(4 * 5 * 2.7, 2) // 54 m²
+    expect(masonryLabor!.unitPrice).toBe(280)
+
+    // Foundation labor: perimeter 20m × DEFAULT_FOOTING_WIDTH_M 0.68m = 13.6 m².
+    const foundationLabor = laborLines.find((l) => l.name === 'Manoperă fundație')
+    expect(foundationLabor).toBeDefined()
+    expect(foundationLabor!.quantity).toBeCloseTo(20 * 0.68, 2)
+    expect(foundationLabor!.unitPrice).toBe(350)
   })
 })

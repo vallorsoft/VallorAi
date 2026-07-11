@@ -945,6 +945,38 @@ model (`Material.source`/`supplierId`) is already built for this, no rework need
   per-type geometry in `RoofMesh.tsx`, and `TieColumnInstances` / `CenturaInstances` render
   the concrete bodies at every LOD tier alongside the Step 9 stirrups.)
 
+- **Labor cost (manoperă) + TVA 19% in cost BOQ (2026-07-11, PR #50)**. The cost estimate
+  now contains three sections beyond raw material lines: a labor section, a tax section, and
+  an extended summary.
+  - **Labor lines**: 8 categories, all `priceVerified: false` (no official Romanian labor-cost
+    index — Bursa Construcțiilor 2024 used as a non-official reference, same stance as material
+    prices): foundation excavation/formwork/pour 350 RON/m², masonry 280, interior plaster 80,
+    thermal insulation 60, painting 35, roofing 200, structural concrete (tie-columns/centuri/
+    lintels) 400, carpentry (windows/doors) 150. Quantities are geometric proxies from the
+    house model — footing perimeter × footing width for foundation labor, gross wall area per
+    trade for plaster/paint/insulation, exterior wall area × 1/cos(pitch) for roofing, number
+    of structural elements × storey height for structural labor, opening count × unit height for
+    carpentry. Zero-quantity lines are filtered out automatically.
+  - **TVA 19%** (Legea 227/2015): one `tax` category line applied to `subtotalMaterials +
+    subtotalLabor`. A localized note (`vatNote`, all 3 locales) explains that the 5% reduced
+    rate may apply under Codul Fiscal art. 291 if price ≤ 600,000 RON and usable area ≤ 120 m².
+    `priceVerified: false` to match the unverified nature of the underlying subtotals.
+  - **Extended `CostEstimateResponse`**: `subtotalMaterials` / `subtotalLabor` / `vatAmount` /
+    `grandTotal` (= materials + labor + VAT); `total` kept as an alias for backward
+    compatibility. The DB `CostEstimate.total` column now stores the `grandTotal`.
+  - **`CostBoqPanel.tsx`** rewritten with three ordered sections — Materials (existing grouped-
+    by-category rendering) → Labor → Tax — each with its own subtotal row, plus a 4-row footer
+    (materials subtotal / labor subtotal / VAT / grand total bold). Shared `BoqLineCard`
+    sub-component extracted for materials and labor lines; Tax gets a custom card that shows
+    `vatAmount` + the `vatNote` amber disclaimer paragraph.
+  - **i18n**: 6 new keys in `Dictionary` and all 3 locale files: `subtotalMaterials`,
+    `subtotalLabor`, `laborSection`, `taxSection`, `vatRate`, `vatNote`. TS enforces all three
+    files stay in sync — missing key = compile error.
+  - **E2E**: `cost-boq.e2e-spec.ts` gained a new test asserting all new response fields are
+    present and positive, `grandTotal ≈ subtotalMaterials + subtotalLabor + vatAmount` (±0.01),
+    `vatAmount ≈ (materials + labor) × 0.19`, labor lines carry `priceVerified: false`, tax
+    line is named `TVA 19%`.
+
 Full original architecture writeup (context, source table, detailed rationale per step) lived
 in a session plan file outside this repo and did not persist — the above is the durable
 reference going forward. Keep this section updated as Steps 5–9 land.

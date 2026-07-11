@@ -162,6 +162,62 @@ export function useCenturi(houseId: string | null | undefined) {
   })
 }
 
+export interface StaircaseRow {
+  id: string
+  houseId: string
+  floor: number
+  posX: number
+  posY: number
+  widthM: number
+  lengthM: number
+  riserCount: number
+  riserHeightMm: number
+  treadDepthMm: number
+  handedness: string
+  isGenerated: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export function useStaircases(houseId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['staircases', houseId],
+    queryFn: async () => {
+      const res = await api.get(`/houses/${houseId}/staircases`)
+      return res.data as StaircaseRow[]
+    },
+    enabled: !!houseId,
+  })
+}
+
+export function useCreateStaircase(houseId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: {
+      floor: number
+      posX?: number
+      posY?: number
+      widthMm?: number
+      floorHeightMm?: number
+      handedness?: string
+    }) => api.post(`/houses/${houseId}/staircases`, data).then((r) => r.data as StaircaseRow),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['staircases', houseId] })
+    },
+  })
+}
+
+export function useDeleteStaircase(houseId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (staircaseId: string) =>
+      api.delete(`/houses/${houseId}/staircases/${staircaseId}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['staircases', houseId] })
+    },
+  })
+}
+
 export interface FoundationAssemblyLayer {
   id: string
   order: number

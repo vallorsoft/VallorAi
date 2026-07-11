@@ -219,6 +219,7 @@ model House {
   foundations Foundation[]
   tieColumns  TieColumn[]
   centuri     Centura[]
+  staircases  Staircase[]
   roof        Roof?
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -537,6 +538,36 @@ model Centura {
 
   @@index([houseId])
   @@index([wallId])
+}
+
+// A staircase flight inside the house. Auto-provisioned by
+// HousesService.getStaircases on first access, with geometry derived from
+// packages/bim-engine stairs.ts (deriveStaircaseSpec). Each row captures:
+//   - riserCount / riserHeightMm / treadDepthMm: the Blondel-formula-derived
+//     step geometry (2R + T ≈ 630mm — classic ergonomic formula, widely
+//     published; see bim-engine stairs.ts for the full citation chain).
+//   - widthM / lengthM: plan footprint (widthM = clear width per STAS 2965-86
+//     / NP 057-2002 min 900mm; lengthM = riserCount × treadDepthMm).
+//   - handedness: 'RIGHT' (landings/handrails on right, ascending) or 'LEFT'.
+//   - isGenerated: auto-provisioned default; user-drawn flights stay false.
+model Staircase {
+  id             String   @id @default(cuid())
+  houseId        String
+  house          House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  floor          Int      @default(0)
+  posX           Float    @default(0)
+  posY           Float    @default(0)
+  widthM         Float    @default(0.9)
+  lengthM        Float    @default(2.5)
+  riserCount     Int      @default(16)
+  riserHeightMm  Float    @default(168.75)
+  treadDepthMm   Float    @default(292.5)
+  handedness     String   @default("RIGHT")
+  isGenerated    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([houseId])
 }
 
 model AssemblyLayer {

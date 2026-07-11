@@ -11,6 +11,7 @@ import { CenturiPanel } from './CenturiPanel'
 import { RoofPanel } from './RoofPanel'
 import { LintelPanel } from './LintelPanel'
 import { CostBoqPanel } from './CostBoqPanel'
+import { StaircasePanel } from './StaircasePanel'
 import { Viewer3D } from '@/components/viewer3d/Viewer3D'
 import { AiChat } from '@/components/ai/AiChat'
 import { useHouse } from '@/hooks/useProjects'
@@ -128,6 +129,7 @@ function panelTitle(
   if (structuralPanel === 'centuri') return t.editor.structuralInspector.centuri.title
   if (structuralPanel === 'roof') return t.editor.structuralInspector.roof.title
   if (structuralPanel === 'cost-boq') return t.editor.costBoqPanel.title
+  if (structuralPanel === 'staircase') return t.editor.structuralInspector.staircase.title
   if (selectedOpeningId) return t.editor.structuralInspector.lintel.title
   if (selectedWallId) return t.editor.layerPanel.title
   return t.editor.propertiesTitle
@@ -145,6 +147,7 @@ function renderRightPanel({
   if (structuralPanel === 'centuri') return <CenturiPanel />
   if (structuralPanel === 'roof') return <RoofPanel />
   if (structuralPanel === 'cost-boq') return <CostBoqPanel />
+  if (structuralPanel === 'staircase') return <StaircasePanel />
   if (selectedOpeningId) return <LintelPanel />
   if (selectedWallId) return <WallLayerPanel />
   return <RoomPanel projectId={projectId} />

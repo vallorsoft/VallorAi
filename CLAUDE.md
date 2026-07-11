@@ -949,6 +949,31 @@ Full original architecture writeup (context, source table, detailed rationale pe
 in a session plan file outside this repo and did not persist — the above is the durable
 reference going forward. Keep this section updated as Steps 5–9 land.
 
+## PDF floor plan export — shipped (2026-07-11, PR #49)
+
+`GET /exports/projects/:id/floor-plan-pdf` returns an A4 landscape PDF floor plan for the
+project identified by `:id`, owned by the requesting user (ownership enforced via
+`prisma.project.findFirst({ where: { id, userId } })` — 404 on mismatch).
+
+Implementation:
+- `apps/api/src/modules/exports/floor-plan-pdf.ts` — pure `PDFKit` generator (`pdfkit ^0.19.1`
+  added to `apps/api` dependencies). Takes a `FloorPlanData` struct (project name, date, rooms,
+  walls) and returns a `Buffer`. Renders: title block (project name, date, scale 1:100), one
+  panel per floor (`Parter` / `Etaj N` / `Subsol N` labelled), room rectangles with humanised
+  type labels + m² areas, wall lines (exterior 1.5px minimum weight, interior lighter), a
+  north-arrow symbol, and a footer with the legal notice "Csak tájékoztató jellegű, nem
+  engedélyezési terv" (not a permit drawing). Multi-floor houses split the page width equally
+  across floor panels. Empty projects (no house/rooms) return a single-page "no data" PDF
+  instead of an error.
+- `ExportsService.generateFloorPlanPdfForProject(projectId, userId)` — queries Prisma with
+  ownership check, maps Room/Wall nullable fields with `?? 0` defaults, calls the generator.
+- `ExportsController.getFloorPlanPdf` (`@Req() req` for user id, `@Res() reply` for Fastify
+  binary send) — follows the same pattern as the existing DXF endpoint.
+- `EditorToolbar.tsx` — "Export PDF" / "PDF export" button (i18n keys `editor.toolExportPdf` +
+  `editor.exportPdfLoading` in all 3 locale files). Uses `fetch` + `localStorage.getItem(
+  'accessToken')` Bearer header → blob → `URL.createObjectURL` + `<a download>` trigger.
+  Loading state disables the button and shows the loading label.
+
 ## Spec documents
 All 13 PDFs in `docs/materials/` are the source of truth.
 Never add functionality not described there.

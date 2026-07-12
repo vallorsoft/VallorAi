@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards, Res, Req } from '@nestjs/common'
+import { Controller, Get, Post, Delete, Param, Body, UseGuards, Res, Req, Request } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport'
 import { FastifyReply } from 'fastify'
@@ -17,11 +17,15 @@ export class ExportsController {
   }
 
   @Get('projects/:id/dxf')
-  async getDxf(@Param('id') projectId: string, @Res() reply: FastifyReply) {
-    const content = this.exportsService.generateDxfPlaceholder(projectId)
+  async getDxf(
+    @Param('id') projectId: string,
+    @Req() req: { user: { id: string } },
+    @Res() reply: FastifyReply,
+  ) {
+    const content = await this.exportsService.generateDxfForProject(projectId, req.user.id)
     reply
       .header('Content-Type', 'application/dxf')
-      .header('Content-Disposition', `attachment; filename="project-${projectId}.dxf"`)
+      .header('Content-Disposition', `attachment; filename="proiect-${projectId}.dxf"`)
       .send(content)
   }
 

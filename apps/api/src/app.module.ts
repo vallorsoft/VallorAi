@@ -10,6 +10,9 @@ import { RulesModule } from './modules/rules/rules.module'
 import { CostsModule } from './modules/costs/costs.module'
 import { ExportsModule } from './modules/exports/exports.module'
 import { SettingsModule } from './modules/settings/settings.module'
+import { AdminModule } from './modules/admin/admin.module'
+import { MarketplaceModule } from './modules/marketplace/marketplace.module'
+import { ImportsModule } from './modules/imports/imports.module'
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { SettingsModule } from './modules/settings/settings.module'
     CostsModule,
     ExportsModule,
     SettingsModule,
+    AdminModule,
+    MarketplaceModule,
+    ImportsModule,
   ],
 })
 export class AppModule {}

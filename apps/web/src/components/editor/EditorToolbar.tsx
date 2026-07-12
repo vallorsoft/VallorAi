@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useProjectStore } from '@/store/project.store'
 import { useTranslation } from '@/lib/useTranslation'
 import type { Dictionary } from '@/locales'
+import { ImportFloorPlanModal } from './ImportFloorPlanModal'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'
 
@@ -31,6 +32,7 @@ export function EditorToolbar() {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [ifcLoading, setIfcLoading] = useState(false)
   const [permitDocLoading, setPermitDocLoading] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const handleDownloadPdf = async () => {
     if (!activeProjectId || pdfLoading) return
@@ -190,7 +192,21 @@ export function EditorToolbar() {
         >
           {permitDocLoading ? t.editor.exportPermitDocLoading : t.editor.toolExportPermitDoc}
         </button>
+        <button
+          onClick={() => setShowImportModal(true)}
+          title={t.floorPlanImport.toolImport}
+          className="px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors text-gray-600 hover:bg-gray-100"
+        >
+          {t.floorPlanImport.toolImport}
+        </button>
       </div>
+
+      {showImportModal && activeProjectId && (
+        <ImportFloorPlanModal
+          projectId={activeProjectId}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
 
       <div className="flex items-center gap-2 shrink-0">
         {/* Floor switcher — 2D shows one level at a time; 3D stacks them all. */}

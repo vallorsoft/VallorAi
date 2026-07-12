@@ -3,6 +3,7 @@ import { prisma } from '@ai-home-designer/database'
 import { generateFloorPlanPdf, FloorPlanData } from './floor-plan-pdf'
 import { generateIfcContent, IfcExportData } from './ifc-generator'
 import { generatePermitDocPdf, PermitDocData } from './permit-doc-pdf'
+import { generateDxf } from './dxf-generator'
 import { ProjectsService } from '../projects/projects.service'
 import { RulesService } from '../rules/rules.service'
 
@@ -186,9 +187,39 @@ export class ExportsService {
     return generateIfcContent(data)
   }
 
-  generateDxfPlaceholder(projectId: string): string {
-    // DXF export placeholder — real implementation requires a CAD library
-    return `; DXF Export placeholder for project ${projectId}\n; Integrate with dxf-writer or ezdxf for full output`
+  async generateDxfForProject(projectId: string, userId: string): Promise<string> {
+    await this.projectsService.assertOwnership(projectId, userId)
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        house: {
+          include: { rooms: true, walls: true },
+        },
+      },
+    })
+    if (!project?.house) return generateDxf([], [])
+
+    const { walls, rooms } = project.house
+
+    const dxfWalls = walls.map((w) => ({
+      startX: w.startX,
+      startY: w.startY,
+      endX: w.endX,
+      endY: w.endY,
+      layer: w.exterior ? `PERETI_EXT_ETAJ_${w.floor ?? 0}` : `PERETI_INT_ETAJ_${w.floor ?? 0}`,
+    }))
+
+    const dxfRooms = rooms.map((r) => ({
+      posX: r.posX,
+      posY: r.posY,
+      width: r.width,
+      depth: r.depth ?? r.width,
+      label: r.type,
+      floor: r.floor ?? 0,
+    }))
+
+    return generateDxf(dxfWalls, dxfRooms)
   }
 
   async generatePermitDocForProject(projectId: string, userId: string): Promise<Buffer> {

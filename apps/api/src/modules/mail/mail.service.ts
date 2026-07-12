@@ -18,7 +18,6 @@ export class MailService {
 
   async sendVerificationEmail(to: string, name: string, token: string): Promise<void> {
     const verifyUrl = `${this.frontendUrl}/verify-email?token=${token}`
-
     const subject = 'Confirmă adresa de email — AI Home Designer'
     const htmlContent = `
       <p>Bună, ${name}!</p>
@@ -26,8 +25,51 @@ export class MailService {
       <p><a href="${verifyUrl}">${verifyUrl}</a></p>
       <p>Linkul expiră în 24 de ore.</p>
     `
-
     await this.send(to, subject, htmlContent)
+  }
+
+  async sendInviteEmail(opts: {
+    to: string
+    inviterName: string
+    projectName: string
+    projectId: string
+    role: string
+  }): Promise<void> {
+    const acceptUrl = `${this.frontendUrl}/projects/${opts.projectId}?acceptInvite=1`
+    const roleLabel = opts.role === 'EDITOR' ? 'editor' : 'vizualizator'
+    const subject = `Invitație colaborare — ${opts.projectName}`
+    const htmlContent = `
+      <p>Bună!</p>
+      <p><strong>${opts.inviterName}</strong> te-a invitat să colaborezi la proiectul
+         <strong>${opts.projectName}</strong> cu rolul de <strong>${roleLabel}</strong>.</p>
+      <p><a href="${acceptUrl}">Acceptă invitația</a></p>
+      <p>Dacă nu ai un cont AI Home Designer, înregistrează-te la
+         <a href="${this.frontendUrl}/register">${this.frontendUrl}/register</a>.</p>
+    `
+    await this.send(opts.to, subject, htmlContent)
+  }
+
+  async sendTaskAssignedEmail(opts: {
+    to: string
+    assignerName: string
+    projectName: string
+    projectId: string
+    taskTitle: string
+    dueDate?: Date | null
+  }): Promise<void> {
+    const projectUrl = `${this.frontendUrl}/projects/${opts.projectId}`
+    const dueLine = opts.dueDate
+      ? `<p>Termen limită: <strong>${opts.dueDate.toLocaleDateString('ro-RO')}</strong></p>`
+      : ''
+    const subject = `Sarcină nouă atribuită — ${opts.projectName}`
+    const htmlContent = `
+      <p>Bună!</p>
+      <p><strong>${opts.assignerName}</strong> ți-a atribuit sarcina
+         <strong>${opts.taskTitle}</strong> în proiectul <strong>${opts.projectName}</strong>.</p>
+      ${dueLine}
+      <p><a href="${projectUrl}">Deschide proiectul</a></p>
+    `
+    await this.send(opts.to, subject, htmlContent)
   }
 
   private async send(to: string, subject: string, htmlContent: string): Promise<void> {

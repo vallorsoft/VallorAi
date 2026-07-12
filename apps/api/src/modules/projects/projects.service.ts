@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common'
 import { prisma } from '@ai-home-designer/database'
 import { ProjectVersionsService } from '../project-versions/project-versions.service'
+import { MailService } from '../mail/mail.service'
 
 type RoomSnapshot = { id: string; houseId: string } & Record<string, unknown>
 type WallSnapshot = { id: string; houseId: string } & Record<string, unknown>
@@ -23,7 +24,10 @@ type MemberRole = (typeof MEMBER_ROLE_ORDER)[number]
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly projectVersions: ProjectVersionsService) {}
+  constructor(
+    private readonly projectVersions: ProjectVersionsService,
+    private readonly mail: MailService,
+  ) {}
 
   /** Lightweight ownership check — avoids findOne's heavy nested include when
    *  callers only need to confirm the project exists and belongs to userId.
@@ -265,8 +269,7 @@ export class ProjectsService {
     email: string,
     role: 'EDITOR' | 'VIEWER',
   ) {
-    // Only the project owner can invite others.
-    await this.assertOwnership(projectId, invitedByUserId)
+    const project = await this.assertOwnership(projectId, invitedByUserId)
 
     const invitedUser = await prisma.user.findUnique({ where: { email } })
     if (!invitedUser)
@@ -274,11 +277,26 @@ export class ProjectsService {
     if (invitedUser.id === invitedByUserId)
       throw new BadRequestException('Saját magát nem hívhatja meg')
 
-    return prisma.projectMember.upsert({
+    const inviter = await prisma.user.findUnique({ where: { id: invitedByUserId } })
+
+    const member = await prisma.projectMember.upsert({
       where: { projectId_userId: { projectId, userId: invitedUser.id } },
       create: { projectId, userId: invitedUser.id, role, invitedBy: invitedByUserId },
       update: { role },
     })
+
+    // Fire-and-forget — don't let email failure break the invite flow
+    this.mail
+      .sendInviteEmail({
+        to: invitedUser.email,
+        inviterName: inviter?.name ?? 'Un colaborator',
+        projectName: project.name,
+        projectId,
+        role,
+      })
+      .catch(() => undefined)
+
+    return member
   }
 
   async acceptInvite(projectId: string, userId: string) {
@@ -341,7 +359,7 @@ export class ProjectsService {
       }
     }
 
-    return prisma.projectTask.create({
+    const task = await prisma.projectTask.create({
       data: {
         projectId,
         title: dto.title,
@@ -354,6 +372,26 @@ export class ProjectsService {
         assignedTo: { select: { id: true, name: true, email: true } },
       },
     })
+
+    // Notify the assignee when the task is assigned to someone else
+    if (dto.assignedToId && dto.assignedToId !== userId && task.assignedTo?.email) {
+      const [assigner, project] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId } }),
+        prisma.project.findUnique({ where: { id: projectId } }),
+      ])
+      this.mail
+        .sendTaskAssignedEmail({
+          to: task.assignedTo.email,
+          assignerName: assigner?.name ?? 'Un coleg',
+          projectName: project?.name ?? projectId,
+          projectId,
+          taskTitle: task.title,
+          dueDate: task.dueDate,
+        })
+        .catch(() => undefined)
+    }
+
+    return task
   }
 
   async updateTask(

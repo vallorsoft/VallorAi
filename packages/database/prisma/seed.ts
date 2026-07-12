@@ -249,6 +249,158 @@ async function main() {
   }
 
   console.log(`Seeded ${materials.length} generic-default materials.`)
+
+  // ── MANUFACTURER materials (marketplace catalog) ────────────────────────
+  // Real product lines, real spec data, priceVerified: false until a live
+  // Bursa Construcțiilor quote or supplier invoice confirms the price.
+  type ManufacturerMaterial = {
+    category: MaterialCategory
+    name: string
+    standardRef: string | null
+    unit: MaterialUnit
+    unitCostRON: number
+    specSheet: Prisma.InputJsonValue
+    supplierId: string
+  }
+
+  const manufacturerMaterials: ManufacturerMaterial[] = [
+    // Leier RO — www.leier.ro
+    {
+      category: 'BLOCK',
+      name: 'Leiertherm 25 N+F',
+      standardRef: 'Leier Leiertherm 25 N+F — SR EN 771-4',
+      unit: 'BUC',
+      unitCostRON: 12,
+      supplierId: 'Leier România',
+      specSheet: {
+        lengthMm: 250, widthMm: 250, heightMm: 238,
+        piecesPerM2: 16, lambdaWmK: 0.19, tongueAndGroove: true,
+        priceVerified: false, priceSource: 'Estimate — leier.ro price list 2024',
+      },
+    },
+    {
+      category: 'BLOCK',
+      name: 'Leier Therm 30 N+F',
+      standardRef: 'Leier Therm 30 N+F — SR EN 771-4',
+      unit: 'BUC',
+      unitCostRON: 14.5,
+      supplierId: 'Leier România',
+      specSheet: {
+        lengthMm: 250, widthMm: 300, heightMm: 238,
+        piecesPerM2: 16, lambdaWmK: 0.17, tongueAndGroove: true,
+        priceVerified: false, priceSource: 'Estimate — leier.ro price list 2024',
+      },
+    },
+    // Wienerberger / Porotherm RO — www.wienerberger.ro
+    {
+      category: 'BLOCK',
+      name: 'Porotherm 30 S Profi',
+      standardRef: 'Wienerberger Porotherm 30 S Profi — SR EN 771-1',
+      unit: 'BUC',
+      unitCostRON: 13,
+      supplierId: 'Wienerberger România',
+      specSheet: {
+        lengthMm: 250, widthMm: 300, heightMm: 238,
+        piecesPerM2: 16, lambdaWmK: 0.18, tongueAndGroove: true,
+        priceVerified: false, priceSource: 'Estimate — wienerberger.ro product catalog 2024',
+      },
+    },
+    {
+      category: 'BLOCK',
+      name: 'Porotherm 38 S Profi',
+      standardRef: 'Wienerberger Porotherm 38 S Profi — SR EN 771-1',
+      unit: 'BUC',
+      unitCostRON: 17,
+      supplierId: 'Wienerberger România',
+      specSheet: {
+        lengthMm: 250, widthMm: 380, heightMm: 238,
+        piecesPerM2: 16, lambdaWmK: 0.16, tongueAndGroove: true,
+        priceVerified: false, priceSource: 'Estimate — wienerberger.ro product catalog 2024',
+      },
+    },
+    // Knauf RO — insulation — www.knauf.ro
+    {
+      category: 'INSULATION',
+      name: 'Knauf Therm Facade 032',
+      standardRef: 'Knauf Therm Facade 032 — SR EN 13163',
+      unit: 'M2',
+      unitCostRON: 38,
+      supplierId: 'Knauf Insulation România',
+      specSheet: {
+        thicknessMm: 100, lambdaWmK: 0.032, fireClass: 'E',
+        application: 'ETICS exterior insulation',
+        priceVerified: false, priceSource: 'Estimate — knauf.ro 2024',
+      },
+    },
+    {
+      category: 'INSULATION',
+      name: 'Knauf Earthwool FKD-S',
+      standardRef: 'Knauf Earthwool FKD-S — SR EN 13162',
+      unit: 'M2',
+      unitCostRON: 45,
+      supplierId: 'Knauf Insulation România',
+      specSheet: {
+        thicknessMm: 100, lambdaWmK: 0.035, fireClass: 'A1',
+        application: 'Mineral wool facade slab',
+        priceVerified: false, priceSource: 'Estimate — knauf.ro 2024',
+      },
+    },
+    // Tondach / Wienerberger RO — roofing
+    {
+      category: 'ROOFING',
+      name: 'Tondach Bramac Alpský šindel',
+      standardRef: 'Tondach Bramac — SR EN 1304',
+      unit: 'BUC',
+      unitCostRON: 6.5,
+      supplierId: 'Wienerberger România',
+      specSheet: {
+        piecesPerM2: 11, minPitchDeg: 22, fireClass: 'A1',
+        color: 'natural red',
+        priceVerified: false, priceSource: 'Estimate — wienerberger.ro 2024',
+      },
+    },
+    {
+      category: 'ROOFING',
+      name: 'Bramac Max 7° Dachstein',
+      standardRef: 'Bramac Dachstein — SR EN 1304',
+      unit: 'BUC',
+      unitCostRON: 7.2,
+      supplierId: 'Wienerberger România',
+      specSheet: {
+        piecesPerM2: 10, minPitchDeg: 7, fireClass: 'A1',
+        color: 'antracit',
+        priceVerified: false, priceSource: 'Estimate — wienerberger.ro 2024',
+      },
+    },
+    // Weber Saint-Gobain — plasters & renders — www.weber.ro
+    {
+      category: 'RENDER',
+      name: 'Weber.therm Klasik külső vakolat',
+      standardRef: 'Weber Saint-Gobain weber.therm klasik — ETAG 004',
+      unit: 'KG',
+      unitCostRON: 2.4,
+      supplierId: 'Saint-Gobain Weber România',
+      specSheet: {
+        grainMm: 2, coverageKgM2: 3.5, fireClass: 'A2',
+        application: 'Exterior decorative silicone-mineral render',
+        priceVerified: false, priceSource: 'Estimate — weber.ro 2024',
+      },
+    },
+  ]
+
+  for (const mat of manufacturerMaterials) {
+    const existing = await prisma.material.findFirst({
+      where: { name: mat.name, source: 'MANUFACTURER' },
+    })
+    const data = { ...mat, source: 'MANUFACTURER' as const }
+    if (existing) {
+      await prisma.material.update({ where: { id: existing.id }, data })
+    } else {
+      await prisma.material.create({ data })
+    }
+  }
+
+  console.log(`Seeded ${manufacturerMaterials.length} manufacturer materials.`)
 }
 
 main()

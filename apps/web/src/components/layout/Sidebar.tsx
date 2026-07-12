@@ -24,7 +24,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     { href: '/marketplace', label: t.sidebar.marketplace, icon: '🛒' },
     { href: '/settings', label: t.sidebar.settings, icon: '⚙️' },
     ...(currentUser?.role === 'SUPERADMIN'
-      ? [{ href: '/admin/ai-settings', label: t.adminAiSettings.title, icon: '' }]
+      ? [
+          { href: '/admin', label: t.admin.navDashboard, icon: '' },
+          { href: '/admin/users', label: t.admin.navUsers, icon: '' },
+          { href: '/admin/ai-settings', label: t.admin.navAiSettings, icon: '' },
+        ]
       : []),
   ]
 

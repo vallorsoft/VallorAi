@@ -411,4 +411,82 @@ export interface Dictionary {
       LIGHTING_POINT: string
     }
   }
+  marketplace: {
+    title: string
+    subtitle: string
+    allCategories: string
+    allSuppliers: string
+    categoryLabel: string
+    supplierLabel: string
+    noResults: string
+    loading: string
+    unitPrice: string
+    standardRef: string
+    priceUnverified: string
+    addToProject: string
+    selectProject: string
+    selectWall: string
+    confirmAdd: string
+    addSuccess: string
+    categories: {
+      BLOCK: string
+      INSULATION: string
+      RENDER: string
+      FINISH: string
+      PAINT: string
+      CONCRETE: string
+      REBAR: string
+      PRECAST: string
+      ROOFING: string
+      OTHER: string
+    }
+  }
+  admin: {
+    title: string
+    dashboardTitle: string
+    usersTitle: string
+    statsUsers: string
+    statsProjects: string
+    statsHouses: string
+    statsMaterials: string
+    userEmail: string
+    userName: string
+    userRole: string
+    userVerified: string
+    userCreated: string
+    changeRole: string
+    roleSaved: string
+    accessDenied: string
+    loading: string
+    navDashboard: string
+    navUsers: string
+    navAiSettings: string
+    roles: {
+      GUEST: string
+      USER: string
+      CLIENT: string
+      ARCHITECT: string
+      STRUCTURAL_ENGINEER: string
+      MEP_ENGINEER: string
+      ELECTRICAL_ENGINEER: string
+      CONTRACTOR: string
+      MANUFACTURER: string
+      SUPPLIER: string
+      ADMIN: string
+      SUPERADMIN: string
+    }
+  }
+  floorPlanImport: {
+    toolImport: string
+    modalTitle: string
+    modalSubtitle: string
+    dropzone: string
+    dropzoneActive: string
+    importing: string
+    success: string
+    error: string
+    close: string
+    importButton: string
+    roomsCreated: string
+  }
 }

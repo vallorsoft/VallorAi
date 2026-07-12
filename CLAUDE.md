@@ -1135,6 +1135,49 @@ reference going forward. Keep this section updated as Steps 5–9 land.
   - **`TaskPanel.tsx`**: inline add-task form (title input + priority dropdown), task cards showing priority badge (color-coded HIGH/MEDIUM/LOW), overdue indicator, assignee name or "Unassigned", mark-done/in-progress action links, per-item delete. No hardcoded strings.
   - **Editor wiring**: `StructuralPanel` union in `project.store.ts` extended with `'tasks'`; toolbar button in `EditorToolbar.tsx` added to `structuralTools`; `panelTitle` + `renderRightPanel` in `EditorLayout.tsx` handle the `'tasks'` case; `TaskPanel` imported.
 
+## Plan D — platform features (2026-07-12, PR #63)
+
+Five cross-cutting features added to the platform (no structural law-module changes):
+
+- **Email notifications (Brevo)**. `MailService.sendInviteEmail` fires on
+  `ProjectsService.inviteMember` (generates an accept-link URL) and `MailService.sendTaskAssignedEmail`
+  fires on `ProjectsService.createTask` when the task has an assignee other than the creator. Both
+  calls are fire-and-forget (`.catch(() => undefined)`) — email failure never interrupts the API
+  response. `MailModule` added to `ProjectsModule` imports.
+
+- **SUPERADMIN admin dashboard UI**. API: `AdminModule` → `AdminService` (platform stats
+  aggregation, paginated user list, role PATCH) + `AdminController` at `/admin/stats`,
+  `/admin/users`, `/admin/users/:id/role`, entire controller behind `@Roles('SUPERADMIN')`.
+  Web: `AdminDashboard.tsx` (4 stat tiles: users / projects / houses / materials + nav cards) and
+  `AdminUsers.tsx` (user table with inline role `<select>` calling `useSetUserRole`). Pages at
+  `/admin` and `/admin/users`. Sidebar SUPERADMIN nav expanded from 1 link (AI Settings) to 3
+  (Dashboard / Users / AI Settings). i18n: `admin.*` section in `Dictionary` + all 3 locale files.
+
+- **Gyártói marketplace MVP**. API: `MarketplaceModule` → `MarketplaceService` lists
+  `source = 'MANUFACTURER'` materials with optional `category`/`supplierId` query params, plus a
+  suppliers list endpoint. `MarketplaceController` at `GET /marketplace/materials` and
+  `GET /marketplace/suppliers`. Seed: 9 `MANUFACTURER` materials across 4 real suppliers (Leier
+  România, Wienerberger România, Knauf Insulation România, Saint-Gobain Weber România) — all with
+  `priceVerified: false` per Key rule 7. Web: `MarketplacePage.tsx` with category + supplier filter
+  dropdowns, material card grid, amber "preț neverificat" badge. Page at `/marketplace`. i18n:
+  `marketplace.*` section in `Dictionary` + all 3 locale files.
+
+- **Real DXF export (replaces placeholder)**. `dxf-generator.ts` — pure TypeScript, zero external
+  deps, outputs R2000 DXF (AC1015): `HEADER` with `$INSUNITS=6` (metres), `ENTITIES` section with
+  one `LINE` per wall segment (layered by floor and exterior flag) and 4 `LINE` + 1 `TEXT` per room
+  bounding box. `ExportsService.generateDxfForProject` is ownership-checked via `userId` and queries
+  live house/room/wall data from the DB. `ExportsController` DXF endpoint threads `userId`.
+
+- **AI floor plan import (Gemini vision)**. `ImportsModule` → `ImportsService.importFloorPlan`
+  calls Gemini vision (`gemini-2.0-flash`) directly via `fetch` with a raw base64 image (bypasses
+  `AIGateway` which only handles text), parses the JSON room list the model returns, and creates
+  `Room` rows via `HousesService`. `ImportsController` at `POST /imports/floor-plan` accepts JSON
+  `{ imageBase64, mimeType, projectId }` (no multipart — `@fastify/multipart` is not installed).
+  Web: `ImportFloorPlanModal.tsx` — drag-and-drop + file picker, `FileReader.readAsDataURL` to
+  base64, importing spinner, success (rooms-created count) + error states. "Import plan" button
+  in `EditorToolbar` opens the modal. i18n: `floorPlanImport.*` section in `Dictionary` + all 3
+  locale files.
+
 ## Spec documents
 All 13 PDFs in `docs/materials/` are the source of truth.
 Never add functionality not described there.
